@@ -1,0 +1,523 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUM DE ROLES ====================
+enum Role {
+  user
+  admin
+  superadmin
+}
+
+enum WorkspaceRole {
+  member
+  admin
+  owner
+}
+
+// ==================== ORGANIZATION ====================
+model Organization {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String          @unique
+  description String?         @db.Text
+  plan        String          @default("free")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  
+  workspaces  Workspace[]
+  members     WorkspaceMember[]
+  
+  @@map("organizations")
+}
+
+// ==================== USER ====================
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String?
+  email         String?   @unique
+  password      String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+
+  // ROL GLOBAL: superadmin, admin, o user
+  role          Role      @default(user)
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  accounts      Account[]
+  sessions      Session[]
+  memberships   WorkspaceMember[]
+  createdTasks  Task[]            @relation("TaskCreator")
+  assignedTasks Task[]            @relation("TaskAssignee")
+  taskMembers   TaskMember[]      
+  chatMessages  ChatMessage[]
+  comments      Comment[]
+  usedInvites   WorkspaceInvite[] @relation("InviteUser")
+  inviteCodes   InviteCode[]      @relation("UserCreatedInviteCodes")
+  activities    Activity[]
+  
+  // ✅ RELACIONES AÑADIDAS PARA USER INVITATION
+  sentInvitations     UserInvitation[] @relation("Inviter")
+  receivedInvitations UserInvitation[] @relation("InvitedUser")
+  
+  @@map("users")
+}
+
+// ==================== WORKSPACE ====================
+model Workspace {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String         @unique
+  plan           String         @default("free")
+  color          String?        @default("#06b6d4")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  
+  organizationId String?        @map("organization_id") @db.Uuid
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  
+  members        WorkspaceMember[]
+  spaces         Space[]
+  folders        Folder[]
+  lists          List[]
+  tasks          Task[]
+  projects       Project[]
+  customFields   CustomField[]
+  chatRooms      ChatRoom[]
+  activities     Activity[]
+  invites        WorkspaceInvite[]
+  inviteCodes    InviteCode[]
+  
+  // ✅ RELACIÓN AÑADIDA PARA USER INVITATION
+  invitations    UserInvitation[]
+  
+  @@map("workspaces")
+}
+
+// ==================== WORKSPACE MEMBER ====================
+model WorkspaceMember {
+  id             String         @id @default(uuid()) @db.Uuid
+  workspaceId    String         @map("workspace_id") @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  
+  // ROL DENTRO DEL WORKSPACE
+  role           WorkspaceRole  @default(member)
+  
+  joinedAt       DateTime       @default(now()) @map("joined_at")
+  
+  organizationId String?        @map("organization_id") @db.Uuid
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+// ==================== WORKSPACE INVITE ====================
+model WorkspaceInvite {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  code        String    @unique
+  email       String?
+  usedBy      String?   @map("used_by") @db.Uuid
+  usedAt      DateTime? @map("used_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation("InviteUser", fields: [usedBy], references: [id])
+  
+  @@index([workspaceId])
+  @@index([code])
+  @@map("workspace_invites")
+}
+
+// ==================== SPACE ====================
+model Space {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  name          String
+  slug          String
+  description   String?
+  icon          String?
+  color         String?  @default("#8b5cf6")
+  isPrivate     Boolean  @default(false) @map("is_private")
+  position      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folders       Folder[]
+  lists         List[]
+  tasks         Task[]
+  
+  @@unique([workspaceId, slug])
+  @@map("spaces")
+}
+
+// ==================== FOLDER ====================
+model Folder {
+  id            String   @id @default(uuid()) @db.Uuid
+  spaceId       String?  @map("space_id") @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  name          String
+  description   String?
+  icon          String?
+  color         String?
+  position      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  space         Space?    @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lists         List[]
+  
+  @@map("folders")
+}
+
+// ==================== LIST ====================
+model List {
+  id            String   @id @default(uuid()) @db.Uuid
+  spaceId       String?  @map("space_id") @db.Uuid
+  folderId      String?  @map("folder_id") @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  name          String
+  description   String?
+  icon          String?
+  color         String?
+  view          String   @default("list")
+  position      Int      @default(0)
+  isArchived    Boolean  @default(false) @map("is_archived")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  space         Space?    @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  folder        Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  
+  @@map("lists")
+}
+
+// ==================== TASK ====================
+model Task {
+  id               String    @id @default(uuid()) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  projectId        String?   @map("project_id") @db.Uuid
+  spaceId          String?   @map("space_id") @db.Uuid
+  listId           String?   @map("list_id") @db.Uuid
+  cycleId          String?   @map("cycle_id") @db.Uuid
+  
+  identifier       String    @unique
+  title            String
+  description      String?   @db.Text
+  
+  status           String    @default("todo")
+  priority         String    @default("medium")
+  
+  dueDate          DateTime? @map("due_date")
+  startDate        DateTime? @map("start_date")
+  
+  parentId         String?   @map("parent_id") @db.Uuid
+  
+  assigneeId       String?   @map("assignee_id") @db.Uuid
+  creatorId        String    @map("creator_id") @db.Uuid
+  
+  position         Int       @default(0)
+  kanbanColumn     String?   @map("kanban_column")
+  calendarStart    DateTime? @map("calendar_start")
+  calendarEnd      DateTime? @map("calendar_end")
+  
+  customAttributes Json      @default("{}") @map("custom_attributes")
+  tags             String[]  @default([])
+  
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  completedAt      DateTime? @map("completed_at")
+  
+  workspace             Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project               Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  space                 Space?        @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  list                  List?         @relation(fields: [listId], references: [id], onDelete: SetNull)
+  cycle                 Cycle?        @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  assignee              User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator               User          @relation("TaskCreator", fields: [creatorId], references: [id])
+  members               TaskMember[]  
+  parent                Task?         @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children              Task[]        @relation("TaskHierarchy")
+  comments              Comment[]
+  attachments           Attachment[]
+  convertedFromMessages ChatMessage[] @relation("ConvertedToTask")
+  activities            Activity[]
+  
+  // ✅ RELACIÓN AÑADIDA PARA USER INVITATION
+  invitations           UserInvitation[]
+  
+  @@index([workspaceId, status])
+  @@index([workspaceId, projectId])
+  @@index([workspaceId, spaceId])
+  @@index([workspaceId, listId])
+  @@index([workspaceId, cycleId])
+  @@index([workspaceId, assigneeId])
+  @@index([workspaceId, priority])
+  @@index([workspaceId, dueDate])
+  @@map("tasks")
+}
+
+// ==================== TASK MEMBER ====================
+model TaskMember {
+  id     String @id @default(uuid()) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_members")
+}
+
+// ==================== PROJECT ====================
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  name        String
+  key         String
+  description String?
+  color       String?
+  icon        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+  cycles    Cycle[]
+  
+  @@unique([workspaceId, key])
+  @@map("projects")
+}
+
+// ==================== CYCLE ====================
+model Cycle {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  number      Int
+  name        String
+  startsAt    DateTime @map("starts_at")
+  endsAt      DateTime @map("ends_at")
+  status      String   @default("planned")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+  
+  @@unique([projectId, number])
+  @@map("cycles")
+}
+
+// ==================== COMMENT ====================
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  creatorId String   @map("creator_id") @db.Uuid
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task    Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  creator User @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("comments")
+}
+
+// ==================== ATTACHMENT ====================
+model Attachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  fileName  String   @map("file_name")
+  fileUrl   String   @map("file_url")
+  fileType  String   @map("file_type")
+  fileSize  Int      @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@map("attachments")
+}
+
+// ==================== CUSTOM FIELD ====================
+model CustomField {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  name        String
+  type        String
+  options     Json?
+  required    Boolean  @default(false)
+  position    Int      @default(0)
+  color       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("custom_fields")
+}
+
+// ==================== CHAT ROOM ====================
+model ChatRoom {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  name        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  
+  @@unique([workspaceId, entityType, entityId])
+  @@map("chat_rooms")
+}
+
+// ==================== CHAT MESSAGE ====================
+model ChatMessage {
+  id                String    @id @default(uuid()) @db.Uuid
+  chatRoomId        String    @map("chat_room_id") @db.Uuid
+  authorId          String    @map("author_id") @db.Uuid
+  content           String    @db.Text
+  reactions         Json      @default("{}")
+  editedAt          DateTime? @map("edited_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  chatRoom          ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  author            User     @relation(fields: [authorId], references: [id])
+  
+  convertedToTaskId String?  @map("converted_to_task_id") @db.Uuid
+  convertedToTask   Task?    @relation("ConvertedToTask", fields: [convertedToTaskId], references: [id])
+  
+  @@index([chatRoomId, createdAt])
+  @@map("chat_messages")
+}
+
+// ==================== ACTIVITY ====================
+model Activity {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  taskId      String?  @map("task_id") @db.Uuid
+  
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  
+  changes     Json?
+  metadata    Json?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  
+  @@index([workspaceId, createdAt])
+  @@index([taskId])
+  @@index([userId])
+  @@map("activities")
+}
+
+// ==================== NEXTAUTH MODELS ====================
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ==================== INVITE CODES (ADMIN2) ====================
+model InviteCode {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique
+  maxUses     Int       @default(1)
+  usedCount   Int       @default(0) @map("used_count")
+  active      Boolean   @default(true)
+  expiresAt   DateTime  @map("expires_at")
+  
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdBy   User?     @relation("UserCreatedInviteCodes", fields: [createdById], references: [id], onDelete: SetNull)
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("invite_codes")
+}
+
+// ==================== INVITACIONES DE USUARIO ====================
+model UserInvitation {
+  id              String    @id @default(uuid()) @db.Uuid
+  workspaceId     String    @map("workspace_id") @db.Uuid
+  invitedUserId   String    @map("invited_user_id") @db.Uuid
+  invitationType  String    @map("invitation_type") // "workspace" o "task"
+  taskId          String?   @map("task_id") @db.Uuid
+  status          String    @default("pending") // "pending", "accepted", "rejected"
+  invitedBy       String    @map("invited_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedUser     User      @relation("InvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  inviter         User      @relation("Inviter", fields: [invitedBy], references: [id], onDelete: Cascade)
+  task            Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@unique([workspaceId, invitedUserId, taskId])
+  @@map("user_invitations")
+}
