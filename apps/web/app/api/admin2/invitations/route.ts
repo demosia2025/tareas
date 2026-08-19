@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       include: {
         invitedUser: { select: { name: true, email: true } },
         workspace: { select: { name: true } },
-        inviter: { select: { name: true } }
+        inviter: { select: { name: true, email: true } }
       },
       orderBy: { createdAt: "desc" }
     });
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { email, workspaceId, invitationType = "workspace" } = body;
+    const { email, workspaceId, invitationType = "workspace", taskId } = body;
 
     if (!email || !workspaceId) {
       return NextResponse.json({ error: "Email y workspace son requeridos" }, { status: 400 });
@@ -68,30 +68,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
     }
 
-    // ✅ CORREGIDO: Uso de 'email' según el esquema de Prisma
+    // 1. Buscar el usuario que se va a invitar por su correo
+    const targetUser = await prisma.user.findUnique({ where: { email } });
+    if (!targetUser) {
+      return NextResponse.json({ error: "El usuario con este correo no está registrado" }, { status: 404 });
+    }
+
+    // 2. Verificar si ya existe una invitación pendiente usando `invitedUserId`
     const existingInvitation = await prisma.userInvitation.findFirst({
       where: {
-        email,
+        invitedUserId: targetUser.id,
         workspaceId,
+        taskId: taskId || null,
         status: "pending"
       }
     });
 
     if (existingInvitation) {
-      return NextResponse.json({ error: "Ya existe una invitación pendiente para este email" }, { status: 400 });
+      return NextResponse.json({ error: "Ya existe una invitación pendiente para este usuario" }, { status: 400 });
     }
 
-    // ✅ CORREGIDO: Uso de 'email' en la creación
+    // 3. Crear la invitación usando `invitedUserId` y `invitedBy`
     const invitation = await prisma.userInvitation.create({
       data: {
-        email,
         workspaceId,
+        invitedUserId: targetUser.id,
+        invitedBy: session.user.id,
         invitationType,
-        inviterId: session.user.id,
+        taskId: taskId || null,
         status: "pending"
       },
       include: {
-        workspace: { select: { name: true } }
+        workspace: { select: { name: true } },
+        invitedUser: { select: { name: true, email: true } }
       }
     });
 
