@@ -65,7 +65,7 @@ export function useDashboard() {
     limit: 3
   });
 
-  const rawRole = (session?.user?.role || "user").toLowerCase().trim();
+     const rawRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
   const isAdmin = rawRole === "admin";
   const isSuperAdmin = rawRole === "super_admin" || rawRole === "superadmin";
 
