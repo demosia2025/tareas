@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       comments: formattedActivities,
-      attachments: attachments.map((att) => ({
+      attachments: attachments.map((att: any) => ({
         id: att.id,
         fileName: att.fileName,
         fileUrl: att.fileUrl,
