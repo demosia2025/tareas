@@ -68,10 +68,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
     }
 
-    // ✅ CORREGIDO: Uso del campo 'invitedEmail' según el esquema Prisma
+    // ✅ CORREGIDO: Uso de 'email' según el esquema de Prisma
     const existingInvitation = await prisma.userInvitation.findFirst({
       where: {
-        invitedEmail: email,
+        email,
         workspaceId,
         status: "pending"
       }
@@ -81,10 +81,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ya existe una invitación pendiente para este email" }, { status: 400 });
     }
 
-    // ✅ CORREGIDO: Uso del campo 'invitedEmail' en la creación
+    // ✅ CORREGIDO: Uso de 'email' en la creación
     const invitation = await prisma.userInvitation.create({
       data: {
-        invitedEmail: email,
+        email,
         workspaceId,
         invitationType,
         inviterId: session.user.id,
