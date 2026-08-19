@@ -2,16 +2,23 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-export async function GET(req: Request, { params }: { params: { taskId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+    
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const comments = await prisma.comment.findMany({
-      where: { taskId: params.taskId },
+      where: { taskId: id },
       include: { creator: true },
       orderBy: { createdAt: "asc" },
     });
 
     const attachments = await prisma.attachment.findMany({
-      where: { taskId: params.taskId },
+      where: { taskId: id },
       orderBy: { createdAt: "desc" },
     });
 
@@ -22,14 +29,15 @@ export async function GET(req: Request, { params }: { params: { taskId: string }
   }
 }
 
-export async function POST(req: Request, { params }: { params: { taskId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
+    
     const session = await auth();
     if (!session || !session.user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Obtenemos el ID del usuario real desde la sesión o buscándolo en la BD por email
     const userRecord = await prisma.user.findUnique({
       where: { email: session.user.email as string },
     });
@@ -47,7 +55,7 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
     if (body && body.trim() !== "") {
       newComment = await prisma.comment.create({
         data: {
-          taskId: params.taskId,
+          taskId: id,
           creatorId: userRecord.id,
           body,
         },
@@ -58,7 +66,7 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
     if (file) {
       newAttachment = await prisma.attachment.create({
         data: {
-          taskId: params.taskId,
+          taskId: id,
           fileName: file.name,
           fileUrl: file.url,
           fileType: file.type || "file",
