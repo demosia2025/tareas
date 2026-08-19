@@ -1,34 +1,30 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
     const session = await auth();
-
+    
     if (!session?.user) {
-      return NextResponse.json(
-        { isAdmin: false },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const userRole = (session.user as any).role || "user";
-    const isAdmin = userRole === "admin" || userRole === "superadmin";
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
 
-    return NextResponse.json({
-      isAdmin,
-      user: {
-        id: (session.user as any).id,
-        email: session.user.email,
-        name: session.user.name,
-        role: userRole,
-      },
+    if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      user: { role: user.role }
     });
   } catch (error) {
-    console.error("Error en /api/admin2/check:", error);
-    return NextResponse.json(
-      { isAdmin: false },
-      { status: 500 }
-    );
+    console.error("Error en check:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
