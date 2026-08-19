@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import crypto from "crypto";
 
 async function getAdminOrganization(userId: string) {
   const membership = await prisma.workspaceMember.findFirst({
@@ -14,7 +13,10 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -29,6 +31,7 @@ export async function GET(req: Request) {
       },
       include: {
         createdBy: { select: { name: true, email: true } },
+        usedBy: { select: { name: true, email: true } },
         workspace: { select: { name: true } }
       },
       orderBy: { createdAt: "desc" }
@@ -43,7 +46,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -64,7 +69,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
     }
 
-    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const inviteCode = await prisma.inviteCode.create({
       data: {
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
       }
     });
 
-    return NextResponse.json({ message: "Código generado", code: inviteCode }, { status: 201 });
+    return NextResponse.json({ message: "Código creado", inviteCode }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -88,7 +93,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -98,6 +105,16 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+    const adminOrgId = await getAdminOrganization(session.user.id);
+    const inviteCode = await prisma.inviteCode.findUnique({ 
+      where: { id },
+      include: { workspace: { select: { organizationId: true } } }
+    });
+    
+    if (!inviteCode || inviteCode.workspace.organizationId !== adminOrgId) {
+      return NextResponse.json({ error: "Código no encontrado o no pertenece a tu organización" }, { status: 403 });
+    }
 
     await prisma.inviteCode.delete({ where: { id } });
 
