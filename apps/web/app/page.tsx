@@ -649,7 +649,7 @@ export default function HomePage() {
    const list = space?.lists?.find((l: any) => l.id === task.listId);
                               if (list && space) {
                                 dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
-                                setTimeout(() => dashboard.openEditModal(task), 300);
+                                setTimeout(() =>    dashboard.openEditModal(task as any), 300);
                               }
                             }}
                             className="w-full text-left p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
@@ -807,7 +807,7 @@ export default function HomePage() {
 
       {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
-      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task), 100); } }} />
+      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() =>    dashboard.openEditModal(task as any), 100); } }} />
 
       {/* ✅ MODAL: CREAR WORKSPACE */}
       {isCreateWorkspaceModalOpen && (
