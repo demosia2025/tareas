@@ -512,8 +512,9 @@ export default function HomePage() {
         
         <aside className={`absolute md:relative z-30 h-full w-64 flex-shrink-0 bg-slate-900/90 md:bg-slate-900/40 border-r border-slate-800/80 backdrop-blur-2xl transition-transform duration-300 ease-in-out flex flex-col overflow-hidden ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
           <div className="flex-1 overflow-y-auto">
+            {/* ✅ CORREGIDO: Agregado '|| ""' para asegurar que workspaceId sea siempre string */}
             <ClickUpSidebar 
-              workspaceId={dashboard.workspaceId} 
+              workspaceId={dashboard.workspaceId || ""} 
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
               onSelectList={dashboard.handleListSelect} 
               onOpenFolderModal={dashboard.handleOpenFolderModal} 
