@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ==================== ENUM DE ROLES ====================
@@ -62,7 +63,7 @@ model User {
   inviteCodes   InviteCode[]      @relation("UserCreatedInviteCodes")
   activities    Activity[]
   
-  // ✅ RELACIONES AÑADIDAS PARA USER INVITATION
+  // ✅ RELACIONES PARA USER INVITATION
   sentInvitations     UserInvitation[] @relation("Inviter")
   receivedInvitations UserInvitation[] @relation("InvitedUser")
   
@@ -93,8 +94,6 @@ model Workspace {
   activities     Activity[]
   invites        WorkspaceInvite[]
   inviteCodes    InviteCode[]
-  
-  // ✅ RELACIÓN AÑADIDA PARA USER INVITATION
   invitations    UserInvitation[]
   
   @@map("workspaces")
@@ -108,7 +107,6 @@ model WorkspaceMember {
   
   // ROL DENTRO DEL WORKSPACE
   role           WorkspaceRole  @default(member)
-  
   joinedAt       DateTime       @default(now()) @map("joined_at")
   
   organizationId String?        @map("organization_id") @db.Uuid
@@ -257,8 +255,6 @@ model Task {
   attachments           Attachment[]
   convertedFromMessages ChatMessage[] @relation("ConvertedToTask")
   activities            Activity[]
-  
-  // ✅ RELACIÓN AÑADIDA PARA USER INVITATION
   invitations           UserInvitation[]
   
   @@index([workspaceId, status])
