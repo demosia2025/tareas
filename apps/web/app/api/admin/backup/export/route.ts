@@ -51,8 +51,7 @@ export async function GET() {
     ])
 
     // Intentar obtener organizaciones si existen
-    let organizations = []
-    try {
+   let organizations: any[] = [];    try {
       // @ts-ignore
       organizations = await prisma.organization.findMany({
         select: {
