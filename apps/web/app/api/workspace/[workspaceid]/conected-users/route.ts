@@ -12,7 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // ✅ 1. Guardamos el ID en una constante segura
+    // Guardamos el ID en una constante segura
     const currentUserId = session.user.id;
     const { workspaceid } = await params;
 
@@ -54,7 +54,7 @@ export async function GET(
       lastSeen: m.userId === currentUserId ? "Ahora" : "Hace 5 min"
     }));
 
-    // ✅ 2. CORREGIDO: Agregar tipos 'any' a 'a' y 'b' en el sort para cumplir con TypeScript estricto
+    // ✅ CORREGIDO: Agregar ': any' a 'a' y 'b' aquí abajo es OBLIGATORIO
     users.sort((a: any, b: any) => {
       if (a.isOnline && !b.isOnline) return -1;
       if (!a.isOnline && b.isOnline) return 1;
