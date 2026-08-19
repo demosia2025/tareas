@@ -1,74 +1,83 @@
-import { NextResponse } from "next/server"
-import { auth } from "@/auth"
-import prisma from "@/lib/prisma"
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
-// GET: Obtener comentarios de la tarea
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Cambiado de 'taskid' a 'id' para coincidir con la carpeta [id]
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const { id } = await params; // ✅ Resolvemos la promesa y obtenemos 'id'
+    
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = await params // ✅ Desestructuramos 'id'
-
-    const comments = await prisma.taskComment.findMany({
+    const comments = await prisma.comment.findMany({
       where: { taskId: id }, // ✅ Usamos 'id' aquí
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, image: true }
-        }
-      },
-      orderBy: { createdAt: "asc" }
-    })
+      include: { creator: true },
+      orderBy: { createdAt: "asc" },
+    });
 
-    return NextResponse.json(comments)
-  } catch (error: any) {
-    console.error("Error obteniendo comentarios:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const attachments = await prisma.attachment.findMany({
+      where: { taskId: id }, // ✅ Usamos 'id' aquí
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ comments, attachments });
+  } catch (error) {
+    console.error("Error cargando comentarios:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
 
-// POST: Crear un comentario o adjuntar archivo
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Cambiado de 'taskid' a 'id'
-) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const { id } = await params; // ✅ Resolvemos la promesa y obtenemos 'id'
+    
+    const session = await auth();
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = await params // ✅ Desestructuramos 'id'
-    const body = await request.json()
-    const { content, fileUrl, fileName } = body
+    const userRecord = await prisma.user.findUnique({
+      where: { email: session.user.email as string },
+    });
 
-    if (!content && !fileUrl) {
-      return NextResponse.json({ error: "El mensaje o archivo es requerido" }, { status: 400 })
+    if (!userRecord) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const comment = await prisma.taskComment.create({
-      data: {
-        taskId: id, // ✅ Usamos 'id' aquí
-        userId: session.user.id,
-        content: content || "",
-        fileUrl: fileUrl || null,
-        fileName: fileName || null,
-      },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, image: true }
-        }
-      }
-    })
+    const bodyData = await req.json();
+    const { body, file } = bodyData;
 
-    return NextResponse.json(comment, { status: 201 })
-  } catch (error: any) {
-    console.error("Error creando comentario:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    let newComment = null;
+    let newAttachment = null;
+
+    if (body && body.trim() !== "") {
+      newComment = await prisma.comment.create({
+        data: {
+          taskId: id, // ✅ Usamos 'id' aquí
+          creatorId: userRecord.id,
+          body,
+        },
+        include: { creator: true },
+      });
+    }
+
+    if (file) {
+      newAttachment = await prisma.attachment.create({
+        data: {
+          taskId: id, // ✅ Usamos 'id' aquí
+          fileName: file.name,
+          fileUrl: file.url,
+          fileType: file.type || "file",
+          fileSize: file.size || 0,
+        },
+      });
+    }
+
+    return NextResponse.json({ comment: newComment, attachment: newAttachment });
+  } catch (error) {
+    console.error("Error guardando comentario:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
