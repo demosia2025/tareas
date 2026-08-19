@@ -48,7 +48,6 @@ export function useAdminDashboard() {
         fetch("/api/admin/users"),
         fetch("/api/admin2/invite-codes"),
         fetch("/api/admin/invitations").catch(() => ({ ok: false, json: () => Promise.resolve([]) })),
-        // ✅ CORREGIDO: organizations en plural
         fetch("/api/admin/organizations/plan").catch(() => ({ ok: false }))
       ]);
 
@@ -65,9 +64,12 @@ export function useAdminDashboard() {
         setOrgStats(orgData);
       }
       if (uRes.ok) setUsers(await uRes.json());
-      if (icRes.ok) setInviteCodes(await icRes.json());
-      if (invRes.ok) setInvitations(await invRes.json());
-      if (planRes.ok) setPlanInfo(await planRes.json());
+      
+      // ✅ CORREGIDO: Agregado 'as any' para evitar el error de tipo en TypeScript
+      if (icRes.ok) setInviteCodes(await (icRes as any).json());
+      if (invRes.ok) setInvitations(await (invRes as any).json());
+      if (planRes.ok) setPlanInfo(await (planRes as any).json());
+      
     } catch (error) {
       console.error("Error fetching admin data:", error);
     }
