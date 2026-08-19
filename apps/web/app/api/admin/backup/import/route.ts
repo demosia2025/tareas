@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { PrismaClient } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
+
 export async function POST(request: Request) {
   try {
     // 1. Validar la sesión del administrador
     const session = await auth();
-    if (!session?.user) return new NextResponse("No autorizado", { status: 401 });
+    if (!session?.user?.id) {
+      return new NextResponse("No autorizado", { status: 401 });
+    }
 
-    const membership = await prisma.workspaceMember.findFirst({
-      where: { 
-        userId: session.user.id,
-        role: "super_admin"
-      },
+    // ✅ CORREGIDO: Consultar el modelo User para verificar el rol global (superadmin)
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
     });
 
-    if (!membership) {
-      return new NextResponse("Acceso prohibido", { status: 403 });
+    if (!user || user.role !== "superadmin") {
+      return new NextResponse("Acceso prohibido: Se requiere rol de superadmin", { status: 403 });
     }
 
     let backupJson: any = null;
