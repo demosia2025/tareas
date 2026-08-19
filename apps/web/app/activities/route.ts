@@ -2,10 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-// ⚠️ IMPORTANTE: Si no tienes el archivo '@/lib/pusher.ts' en tu proyecto, 
-// comenta la siguiente línea y el bloque de pusherServer.trigger más abajo.
-import { pusherServer } from "@/lib/pusher"; 
-
 // GET: Obtener comentarios, archivos adjuntos y datos de la tarea
 export async function GET(req: Request) {
   try {
@@ -45,7 +41,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Crear comentario o archivo y disparar tiempo real con Pusher
+// POST: Crear comentario o archivo
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -76,14 +72,6 @@ export async function POST(req: Request) {
           },
         },
       });
-
-      // Disparamos la notificación en tiempo real con Pusher
-      // (Comenta estas 4 líneas si no tienes pusher configurado)
-      if (typeof pusherServer !== 'undefined') {
-        await pusherServer.trigger(`task-${taskId}`, "new-comment", {
-          comment: newComment,
-        });
-      }
     }
 
     // Si viene un archivo adjunto
