@@ -13,7 +13,10 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -43,7 +46,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -98,7 +103,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -108,6 +115,16 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+    const adminOrgId = await getAdminOrganization(session.user.id);
+    const invitation = await prisma.userInvitation.findUnique({ 
+      where: { id },
+      include: { workspace: { select: { organizationId: true } } }
+    });
+    
+    if (!invitation || invitation.workspace.organizationId !== adminOrgId) {
+      return NextResponse.json({ error: "Invitación no encontrada o no pertenece a tu organización" }, { status: 403 });
+    }
 
     await prisma.userInvitation.delete({ where: { id } });
 
