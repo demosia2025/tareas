@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/auth";
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     const { workspaceId } = await request.json();
 
     if (!session?.user?.id) {
@@ -26,7 +17,7 @@ export async function POST(request: Request) {
     // Verificar si el usuario es admin del workspace
     const member = await prisma.workspaceMember.findFirst({
       where: {
-        userId: session.user.id,
+        userId: session.user.id as string,
         workspaceId,
       },
       include: { workspace: true },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(
   req: Request,
@@ -8,7 +8,7 @@ export async function POST(
   try {
     const { assigneeId } = await req.json();
 
-    const updatedTask = await db.task.update({
+    const updatedTask = await prisma.task.update({
       where: { id: params.id },
       data: { assigneeId: assigneeId || null },
       include: {

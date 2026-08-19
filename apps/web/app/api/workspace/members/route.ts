@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request, { params }: { params: { workspaceId: string } }) {
   try {
-    const members = await db.workspaceMember.findMany({
+    const members = await prisma.workspaceMember.findMany({
       where: { workspaceId: params.workspaceId },
       include: { user: true },
     });
@@ -19,14 +19,14 @@ export async function POST(req: Request, { params }: { params: { workspaceId: st
   try {
     const { email } = await req.json();
     
-    const user = await db.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
       return NextResponse.json({ error: "El usuario no está registrado en la plataforma" }, { status: 404 });
     }
 
     // Verificar si ya es miembro
-    const existingMember = await db.workspaceMember.findUnique({
+    const existingMember = await prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
           workspaceId: params.workspaceId,
@@ -39,7 +39,7 @@ export async function POST(req: Request, { params }: { params: { workspaceId: st
       return NextResponse.json({ error: "El usuario ya forma parte de este workspace" }, { status: 400 });
     }
 
-    const newMember = await db.workspaceMember.create({
+    const newMember = await prisma.workspaceMember.create({
       data: {
         workspaceId: params.workspaceId,
         userId: user.id,

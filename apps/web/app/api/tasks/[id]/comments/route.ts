@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-// Ajusta la importación de tus opciones de auth según tu proyecto (ej: @/auth o @/lib/auth)
-import { authOptions } from "@/lib/auth"; 
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function GET(req: Request, { params }: { params: { taskId: string } }) {
   try {
-    const comments = await db.comment.findMany({
+    const comments = await prisma.comment.findMany({
       where: { taskId: params.taskId },
       include: { creator: true },
       orderBy: { createdAt: "asc" },
     });
 
-    const attachments = await db.attachment.findMany({
+    const attachments = await prisma.attachment.findMany({
       where: { taskId: params.taskId },
       orderBy: { createdAt: "desc" },
     });
@@ -26,14 +24,14 @@ export async function GET(req: Request, { params }: { params: { taskId: string }
 
 export async function POST(req: Request, { params }: { params: { taskId: string } }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session || !session.user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     // Obtenemos el ID del usuario real desde la sesión o buscándolo en la BD por email
-    const userRecord = await db.user.findUnique({
-      where: { email: session.user.email! },
+    const userRecord = await prisma.user.findUnique({
+      where: { email: session.user.email as string },
     });
 
     if (!userRecord) {
@@ -47,7 +45,7 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
     let newAttachment = null;
 
     if (body && body.trim() !== "") {
-      newComment = await db.comment.create({
+      newComment = await prisma.comment.create({
         data: {
           taskId: params.taskId,
           creatorId: userRecord.id,
@@ -58,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { taskId: string 
     }
 
     if (file) {
-      newAttachment = await db.attachment.create({
+      newAttachment = await prisma.attachment.create({
         data: {
           taskId: params.taskId,
           fileName: file.name,
