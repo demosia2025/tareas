@@ -33,8 +33,8 @@ export async function checkUserLimit(organizationId: string): Promise<{
 
   // Contar usuarios únicos en todos los workspaces de la organización
   const uniqueUserIds = new Set<string>();
-  org.workspaces.forEach(ws => {
-    ws.members.forEach(member => {
+  org.workspaces.forEach(ws any=> {
+    ws.members.forEach(member any=> {
       uniqueUserIds.add(member.userId);
     });
   });
