@@ -13,7 +13,8 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // ✅ CORREGIDO: Verificamos session.user?.id
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -21,7 +22,6 @@ export async function GET(req: Request) {
     }
 
     const adminOrgId = await getAdminOrganization(session.user.id);
-    
     const workspaces = await prisma.workspace.findMany({
       where: { organizationId: adminOrgId },
       include: {
@@ -29,7 +29,6 @@ export async function GET(req: Request) {
       },
       orderBy: { createdAt: "desc" }
     });
-
     return NextResponse.json(workspaces);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,7 +38,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -59,13 +58,7 @@ export async function POST(req: Request) {
     }
 
     const workspace = await prisma.workspace.create({
-      data: {
-        name,
-        slug,
-        plan,
-        color,
-        organizationId: adminOrgId
-      }
+      data: { name, slug, plan, color, organizationId: adminOrgId }
     });
 
     return NextResponse.json({ message: "Workspace creado", workspace }, { status: 201 });
@@ -77,7 +70,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -93,7 +86,7 @@ export async function PUT(req: Request) {
 
     const adminOrgId = await getAdminOrganization(session.user.id);
     const existingWorkspace = await prisma.workspace.findUnique({ where: { id } });
-    
+
     if (!existingWorkspace || existingWorkspace.organizationId !== adminOrgId) {
       return NextResponse.json({ error: "Workspace no encontrado o no pertenece a tu organización" }, { status: 403 });
     }
@@ -117,7 +110,7 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -130,13 +123,12 @@ export async function DELETE(req: Request) {
 
     const adminOrgId = await getAdminOrganization(session.user.id);
     const existingWorkspace = await prisma.workspace.findUnique({ where: { id } });
-    
+
     if (!existingWorkspace || existingWorkspace.organizationId !== adminOrgId) {
       return NextResponse.json({ error: "Workspace no encontrado o no pertenece a tu organización" }, { status: 403 });
     }
 
     await prisma.workspace.delete({ where: { id } });
-
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

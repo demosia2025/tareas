@@ -14,7 +14,7 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
@@ -126,7 +126,6 @@ export async function PUT(req: Request) {
     if (workspaceId) {
       const adminOrgId = await getAdminOrganization(session.user.id);
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-      
       if (!workspace || workspace.organizationId !== adminOrgId) {
         return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
       }
@@ -151,7 +150,7 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
