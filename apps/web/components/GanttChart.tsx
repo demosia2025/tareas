@@ -38,11 +38,13 @@ export const GanttChart: React.FC = () => {
 
   // Rango de fechas generado dinámicamente para Julio/Agosto 2026
   const timelineDays = useMemo(() => {
-    const days = [];
-    for (let i = 1; i <= 31; i++) {
-      days.value = `${i < 10 ? '0' + i : i} Jul`;
-      days.push(`${i < 10 ? '0' + i : i} Jul`);
-    }
+       const days = [];
+   for (let i = 1; i <= 31; i++) {
+     days.push(`${i < 10 ? '0' + i : i} Jul`); // ✅ CORRECTO
+   }
+   for (let i = 1; i <= 10; i++) {
+     days.push(`${i < 10 ? '0' + i : i} Aug`);
+   }
     for (let i = 1; i <= 10; i++) {
       days.push(`0${i} Ago`);
     }
