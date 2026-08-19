@@ -1,7 +1,7 @@
 // apps/web/lib/authorization.ts
 
 import { prisma } from "@/lib/prisma";
-import { getPlanLimits,} from "./plan-limits";
+import { getPlanLimits } from "./plan-limits";
 
 export interface AuthContext {
   userId: string;
@@ -33,8 +33,8 @@ export async function checkUserLimit(organizationId: string): Promise<{
 
   // Contar usuarios únicos en todos los workspaces de la organización
   const uniqueUserIds = new Set<string>();
-  org.workspaces.forEach(ws any=> {
-    ws.members.forEach(member any=> {
+  org.workspaces.forEach((ws: any) => {
+    ws.members.forEach((member: any) => {
       uniqueUserIds.add(member.userId);
     });
   });
