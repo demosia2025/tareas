@@ -645,8 +645,8 @@ export default function HomePage() {
                           <button
                             key={task.id}
                             onClick={() => {
-                              const space = dashboard.spaces.find(s => s.id === task.spaceId);
-                              const list = space?.lists?.find(l => l.id === task.listId);
+                              const space = dashboard.spaces.find((s: any) => s.id === task.spaceId);
+   const list = space?.lists?.find((l: any) => l.id === task.listId);
                               if (list && space) {
                                 dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
                                 setTimeout(() => dashboard.openEditModal(task), 300);
