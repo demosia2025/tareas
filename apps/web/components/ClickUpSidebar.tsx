@@ -7,6 +7,7 @@ interface ClickUpSidebarProps {
   workspaceId: string;
   organizationName?: string;
   onSelectList: (list: { id: string; name: string; spaceId: string; folderId?: string }) => void;
+  onOpenFolderModal?: (spaceId: string) => void; // ✅ AGREGADO: Prop opcional para compatibilidad
   currentUser?: { id?: string; role?: string };
 }
 
@@ -30,10 +31,16 @@ interface ListData {
   name: string;
   createdById?: string | null;
   _count?: { tasks: number };
-  folderId?: string | null; // ✅ AÑADIDO: Necesario para filtrar y evitar duplicados
+  folderId?: string | null;
 }
 
-export function ClickUpSidebar({ workspaceId, organizationName: propOrgName, onSelectList, currentUser }: ClickUpSidebarProps) {
+export function ClickUpSidebar({ 
+  workspaceId, 
+  organizationName: propOrgName, 
+  onSelectList, 
+  onOpenFolderModal, // ✅ AGREGADO: Se acepta la prop
+  currentUser 
+}: ClickUpSidebarProps) {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [organizationName, setOrganizationName] = useState<string>(propOrgName || "Mi Organización");
   const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(new Set());
@@ -402,10 +409,15 @@ export function ClickUpSidebar({ workspaceId, organizationName: propOrgName, onS
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveSpaceForFolder(space.id);
-                      setActiveSpaceForList(null);
-                      setNewFolderName("");
-                      setExpandedSpaces(prev => new Set(prev).add(space.id));
+                      // ✅ Si existe onOpenFolderModal, lo usamos; si no, usamos el flujo interno
+                      if (onOpenFolderModal) {
+                        onOpenFolderModal(space.id);
+                      } else {
+                        setActiveSpaceForFolder(space.id);
+                        setActiveSpaceForList(null);
+                        setNewFolderName("");
+                        setExpandedSpaces(prev => new Set(prev).add(space.id));
+                      }
                     }}
                     className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-700/60 rounded-lg transition-all"
                     title="Añadir carpeta a este espacio"
@@ -639,7 +651,6 @@ export function ClickUpSidebar({ workspaceId, organizationName: propOrgName, onS
                     </div>
                   ))}
 
-                  {/* ✅ CORRECCIÓN CLAVE: Filtrar solo las listas que NO tienen folderId (nivel de espacio) */}
                   {space.lists?.filter(list => !list.folderId).map((list) => (
                     <div key={list.id} className="group/list relative flex items-center">
                       {editingListId === list.id ? (
