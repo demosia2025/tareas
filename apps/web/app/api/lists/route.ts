@@ -150,7 +150,7 @@ export async function PUT(request: Request) {
       }
     })
 
-    const isAdminOrSuper = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || membership?.role === "admin";
+    const isAdminOrSuper = userRole === "ADMIN" || userRole === "superadmin" || membership?.role === "admin";
 
     if (!isAdminOrSuper && !membership) {
       return NextResponse.json(
@@ -210,7 +210,7 @@ export async function DELETE(request: Request) {
       }
     })
 
-    const isAdminOrSuper = userRole === "ADMIN" || userRole === "SUPER_ADMIN" || membership?.role === "admin";
+    const isAdminOrSuper = userRole === "ADMIN" || userRole === "superadmin" || membership?.role === "admin";
 
     if (!isAdminOrSuper && !membership) {
       return NextResponse.json(

@@ -67,7 +67,7 @@ export function useDashboard() {
 
      const rawRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
   const isAdmin = rawRole === "admin";
-  const isSuperAdmin = rawRole === "super_admin" || rawRole === "superadmin";
+  const isSuperAdmin = rawRole === "superadmin" || rawRole === "superadmin";
 
   useEffect(() => {
     if (status === "unauthenticated") return;

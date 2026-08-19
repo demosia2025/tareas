@@ -17,7 +17,7 @@ export async function PATCH(
     const superAdminMember = await prisma.workspaceMember.findFirst({
       where: {
         userId: session.user.id,
-        role: "super_admin",
+        role: "superadmin",
       },
     });
 
@@ -59,7 +59,7 @@ export async function DELETE(
     const superAdminMember = await prisma.workspaceMember.findFirst({
       where: {
         userId: session.user.id,
-        role: "super_admin",
+        role: "superadmin",
       },
     });
 

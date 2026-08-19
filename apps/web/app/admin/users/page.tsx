@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([
-    { id: "1", name: "Super Administrador", email: "superadmin@projects-saas.com", role: "super_admin" }
+    { id: "1", name: "Super Administrador", email: "superadmin@projects-saas.com", role: "superadmin" }
   ]);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
