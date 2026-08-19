@@ -1,7 +1,7 @@
 // apps/web/lib/authorization.ts
 
 import { prisma } from "@/lib/prisma";
-import { getPlanLimits, canAddUser } from "./plan-limits";
+import { getPlanLimits,} from "./plan-limits";
 
 export interface AuthContext {
   userId: string;
