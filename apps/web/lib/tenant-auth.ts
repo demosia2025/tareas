@@ -28,9 +28,9 @@ export async function getTenantContext() {
     select: { organizationId: true, workspaceId: true }
   });
 
-    const allowedOrgIds = [...new Set(memberships.map((m: any) => m.organizationId).filter(Boolean))] as string[];
+      const rawOrgIds = memberships.map((m: any) => m.organizationId).filter(Boolean) as string[];
+  const allowedOrgIds = [...new Set<string>(rawOrgIds)];
   const allowedWorkspaceIds = memberships.map((m: any) => m.workspaceId).filter(Boolean) as string[];
-
   if (allowedOrgIds.length === 0) {
     return { error: NextResponse.json({ error: "No perteneces a ninguna organización" }, { status: 403 }) };
   }
