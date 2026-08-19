@@ -8,10 +8,14 @@ export async function GET(
 ) {
   try {
     const session = await auth();
+    
+    // ✅ 1. Verificamos explícitamente que session.user.id exista
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    // ✅ 2. Guardamos el ID en una constante para que TypeScript sepa que es un string seguro
+    const currentUserId = session.user.id;
     const { workspaceid } = await params;
 
     // ✅ CORRECCIÓN CLAVE: Usar findFirst en lugar de findUnique con compound ID 
@@ -19,7 +23,7 @@ export async function GET(
     const membership = await prisma.workspaceMember.findFirst({
       where: {
         workspaceId: workspaceid,
-        userId: session.user.id
+        userId: currentUserId
       }
     });
 
@@ -45,14 +49,15 @@ export async function GET(
       }
     });
 
+    // ✅ 3. Usamos la constante segura 'currentUserId' en lugar de session.user.id
     const users = members.map((m: any) => ({
       id: m.user.id,
       name: m.user.name || "Usuario",
       email: m.user.email,
       image: m.user.image,
       role: m.role,
-      isOnline: m.userId === session.user.id, // Simulación: solo el usuario actual aparece online
-      lastSeen: m.userId === session.user.id ? "Ahora" : "Hace 5 min"
+      isOnline: m.userId === currentUserId, // Simulación: solo el usuario actual aparece online
+      lastSeen: m.userId === currentUserId ? "Ahora" : "Hace 5 min"
     }));
 
     // ✅ Ordenar: online primero
