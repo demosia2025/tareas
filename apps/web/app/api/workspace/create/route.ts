@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       .replace(/^-+|-+$/g, "") + "-" + Date.now().toString().slice(-4);
 
     // Transacción para crear organización (si aplica), workspace y membresía
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       let orgId = null;
 
       if (organizationName && organizationName.trim() !== "") {
