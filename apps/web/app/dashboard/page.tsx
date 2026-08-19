@@ -615,7 +615,7 @@ export default function DashboardPage() {
                       <td className="py-2 px-2">
                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border ${p.color}`}>{p.label}</span>
                       </td>
-                      <td className="py-2 px-2 text-[11px] text-slate-400 font-medium">{formatDate(task.createdAt)}</td>
+                      <td className="py-2 px-2 text-[11px] text-slate-400 font-medium">{formatDate(task.createdAt ?? null)}</td>
                       <td className="py-2 px-2 text-[11px] text-amber-400 font-bold">{durationStr}</td>
                     </tr>
                   );
