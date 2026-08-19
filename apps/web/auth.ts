@@ -64,7 +64,8 @@ export const { handlers, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
+      // ✅ CORREGIDO: Verificamos que user Y user.id existan antes de usarlos
+      if (user && user.id) {
         token.sub = user.id.toString();
         token.role = (user as any).role;
       }
