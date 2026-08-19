@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
-export async function GET(req: Request, { params }: { params: { workspaceId: string } }) {
+export async function GET(req: Request) { // ✅ Eliminamos 'params' de aquí
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const workspaceId = searchParams.get("workspaceId");
+
+    if (!workspaceId) {
+      return NextResponse.json({ error: "workspaceId requerido" }, { status: 400 });
+    }
+
     const members = await prisma.workspaceMember.findMany({
-      where: { workspaceId: params.workspaceId },
-      include: { user: true },
+      where: { workspaceId },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      }
     });
 
     return NextResponse.json(members);
@@ -15,8 +30,20 @@ export async function GET(req: Request, { params }: { params: { workspaceId: str
   }
 }
 
-export async function POST(req: Request, { params }: { params: { workspaceId: string } }) {
+export async function POST(req: Request) { // ✅ Eliminamos 'params' de aquí también
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const workspaceId = searchParams.get("workspaceId");
+
+    if (!workspaceId) {
+      return NextResponse.json({ error: "workspaceId requerido" }, { status: 400 });
+    }
+
     const { email } = await req.json();
     
     const user = await prisma.user.findUnique({ where: { email } });
@@ -29,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { workspaceId: st
     const existingMember = await prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
-          workspaceId: params.workspaceId,
+          workspaceId: workspaceId,
           userId: user.id,
         },
       },
@@ -41,7 +68,7 @@ export async function POST(req: Request, { params }: { params: { workspaceId: st
 
     const newMember = await prisma.workspaceMember.create({
       data: {
-        workspaceId: params.workspaceId,
+        workspaceId: workspaceId,
         userId: user.id,
         role: "member",
       },
