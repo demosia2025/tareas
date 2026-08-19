@@ -1,135 +1,82 @@
-import { NextResponse } from "next/server"
-import { getTenantContext } from "@/lib/tenant-auth"
-import prisma from "@/lib/prisma"
+// apps/web/app/admin/workspaces/page.tsx
+"use client";
 
-export async function GET() {
-  try {
-    const ctx = await getTenantContext();
-    if ("error" in ctx) return ctx.error;
+import { useState, useEffect } from "react";
+import { Building2, Plus, Edit2, Trash2 } from "lucide-react";
 
-    // ✅ FILTRO DE AISLAMIENTO: Si no es superadmin, solo ve sus organizaciones
-    const whereClause = ctx.isSuperAdmin 
-      ? {} 
-      : { organizationId: { in: ctx.allowedOrgIds } };
+export default function AdminWorkspacesPage() {
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    const workspaces = await prisma.workspace.findMany({
-      where: whereClause,
-      include: {
-        organization: { select: { id: true, name: true, slug: true } }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+  useEffect(() => {
+    fetchWorkspaces();
+  }, []);
 
-    return NextResponse.json(workspaces);
-  } catch (error: any) {
-    console.error("Error obteniendo workspaces:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const ctx = await getTenantContext();
-    if ("error" in ctx) return ctx.error;
-
-    const body = await request.json();
-    const { name, slug, plan, organizationId } = body;
-
-    if (!name || !slug || !organizationId) {
-      return NextResponse.json({ error: "Nombre, slug y Organización son requeridos" }, { status: 400 });
-    }
-
-    // ✅ VALIDACIÓN: Solo puede crear en orgs a las que pertenece (o superadmin)
-    if (!ctx.isSuperAdmin && !ctx.allowedOrgIds?.includes(organizationId)) {
-      return NextResponse.json({ error: "No tienes permisos para crear workspaces en esta organización" }, { status: 403 });
-    }
-
-    const workspace = await prisma.workspace.create({
-      data: {
-        name,
-        slug,
-        plan: plan || "free",
-        organizationId
-      },
-      include: {
-        organization: { select: { id: true, name: true, slug: true } }
+  const fetchWorkspaces = async () => {
+    try {
+      const res = await fetch("/admin/workspaces");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaces(data);
       }
-    });
-
-    return NextResponse.json(workspace, { status: 201 });
-  } catch (error: any) {
-    console.error("Error creando workspace:", error);
-    if (error.code === 'P2002') {
-      return NextResponse.json({ error: "El slug ya está en uso" }, { status: 409 });
+    } catch (error) {
+      console.error("Error cargando workspaces:", error);
+    } finally {
+      setLoading(false);
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+  };
 
-export async function PATCH(request: Request) {
-  try {
-    const ctx = await getTenantContext();
-    if ("error" in ctx) return ctx.error;
+  if (loading) return <div className="p-8 text-center text-slate-400">Cargando workspaces...</div>;
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Building2 className="w-6 h-6 text-cyan-400" /> Workspaces
+        </h1>
+        <button className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all">
+          <Plus className="w-4 h-4" /> Nuevo Workspace
+        </button>
+      </div>
 
-    const body = await request.json();
-    const { name, slug, plan, organizationId } = body;
-
-    // ✅ VALIDACIÓN PARA MOVER WORKSPACE DE ORGANIZACIÓN
-    if (organizationId) {
-      // Verificar si el usuario tiene permiso en la ORGANIZACIÓN DE DESTINO
-      if (!ctx.isSuperAdmin && !ctx.allowedOrgIds?.includes(organizationId)) {
-        return NextResponse.json({ 
-          error: "No tienes permisos para mover este workspace a esa organización" 
-        }, { status: 403 });
-      }
-    }
-
-    const updatedWorkspace = await prisma.workspace.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(slug && { slug }),
-        ...(plan && { plan }),
-        ...(organizationId && { organizationId }) // ✅ Aquí ocurre el "movimiento"
-      },
-      include: {
-        organization: { select: { id: true, name: true, slug: true } }
-      }
-    });
-
-    return NextResponse.json(updatedWorkspace);
-  } catch (error: any) {
-    console.error("Error editando workspace:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const ctx = await getTenantContext();
-    if ("error" in ctx) return ctx.error;
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
-
-    await prisma.workspace.delete({
-      where: { id }
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error("Error eliminando workspace:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-950/60 border-b border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <tr>
+              <th className="py-3 px-4">Nombre</th>
+              <th className="py-3 px-4">Organización</th>
+              <th className="py-3 px-4">Plan</th>
+              <th className="py-3 px-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/60">
+            {workspaces.map((ws) => (
+              <tr key={ws.id} className="hover:bg-slate-800/30 transition-colors text-xs">
+                <td className="py-3 px-4 font-semibold text-white">{ws.name}</td>
+                <td className="py-3 px-4 text-slate-400">{ws.organization?.name || "N/A"}</td>
+                <td className="py-3 px-4">
+                  <span className="px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 capitalize">
+                    {ws.plan}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-right flex justify-end gap-2">
+                  <button className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-lg transition-all">
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-all">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {workspaces.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-8 text-center text-slate-500">No hay workspaces registrados.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
