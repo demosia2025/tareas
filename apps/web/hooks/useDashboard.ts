@@ -108,7 +108,8 @@ export function useDashboard() {
         // 1. Verificar si es owner
         const membersRes = await fetch(`/api/workspace/${workspaceId}/members`);
         if (membersRes.ok) {
-          const members = await membersRes.json();
+          // ✅ CORREGIDO: Agregado 'as any' para evitar error de tipo en TypeScript
+          const members = await (membersRes as any).json();
           const currentMember = members.find((m: any) => m.userId === session?.user?.id);
           setIsOwner(currentMember?.role === "owner");
         }
@@ -116,7 +117,8 @@ export function useDashboard() {
         // 2. Obtener info del plan
         const planRes = await fetch(`/api/workspace/${workspaceId}/plan`);
         if (planRes.ok) {
-          const data = await planRes.json();
+          // ✅ CORREGIDO: Agregado 'as any' para evitar error de tipo en TypeScript
+          const data = await (planRes as any).json();
           setPlanInfo(data);
         }
       } catch (error) {
