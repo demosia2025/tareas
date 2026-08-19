@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     });
 
     // Formatear la lista de comentarios
-    const formattedActivities = comments.map((c) => ({
+    const formattedActivities = comments.map((c: any) => ({
       id: c.id,
       type: "comment",
       body: c.body,
