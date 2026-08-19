@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+// GET: Obtener comentarios y archivos adjuntos de una tarea
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -11,6 +12,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "taskId es requerido" }, { status: 400 });
     }
 
+    // Consultar comentarios con los datos del usuario creador
     const comments = await prisma.comment.findMany({
       where: { taskId },
       include: { 
@@ -19,18 +21,20 @@ export async function GET(req: Request) {
             id: true,
             name: true,
             email: true,
-            image: true
-          }
-        } 
+            image: true,
+          },
+        }, 
       },
       orderBy: { createdAt: "asc" },
     });
 
+    // Consultar archivos adjuntos asociados a la tarea
     const attachments = await prisma.attachment.findMany({
       where: { taskId },
       orderBy: { createdAt: "desc" },
     });
 
+    // Formatear la lista de comentarios
     const formattedActivities = comments.map((c) => ({
       id: c.id,
       type: "comment",
@@ -57,9 +61,10 @@ export async function GET(req: Request) {
   }
 }
 
+// POST: Crear un comentario o adjuntar un archivo en una tarea
 export async function POST(req: Request) {
   try {
-    // ✅ CORREGIDO: Usar la sesión autenticada real
+    // Validar la sesión autenticada del usuario
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -72,7 +77,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "taskId es requerido" }, { status: 400 });
     }
 
-    // 1. Si viene un archivo adjunto, lo guardamos en la tabla Attachment
+    // 1. Guardar archivo adjunto si viene en el payload
     if (file && file.name && file.url) {
       await prisma.attachment.create({
         data: {
@@ -85,13 +90,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Si viene texto de comentario, lo guardamos con el ID del usuario DE LA SESIÓN
+    // 2. Guardar comentario asociado al usuario de la sesión
     let newComment = null;
     if (body && body.trim() !== "") {
       newComment = await prisma.comment.create({
         data: {
           taskId,
-          creatorId: session.user.id, // ✅ AHORA USA EL ID REAL DEL USUARIO AUTENTICADO
+          creatorId: session.user.id,
           body,
         },
         include: { 
@@ -100,9 +105,9 @@ export async function POST(req: Request) {
               id: true,
               name: true,
               email: true,
-              image: true
-            }
-          } 
+              image: true,
+            },
+          }, 
         },
       });
     }
