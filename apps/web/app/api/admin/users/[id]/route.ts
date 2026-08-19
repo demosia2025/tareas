@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ✅ params ahora es una Promesa
 ) {
   try {
+    const { id } = await params; // ✅ Resolvemos la promesa para obtener el id
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -28,7 +29,7 @@ export async function PATCH(
     const { name, slug, plan, organizationId } = body;
 
     const updatedWorkspace = await prisma.workspace.update({
-      where: { id: params.id },
+      where: { id }, // ✅ Usamos el id resuelto
       data: {
         ...(name !== undefined && { name }),
         ...(slug !== undefined && { slug }),
@@ -45,9 +46,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ✅ params ahora es una Promesa
 ) {
   try {
+    const { id } = await params; // ✅ Resolvemos la promesa para obtener el id
     const session = await auth();
 
     if (!session?.user?.id) {
@@ -66,7 +68,7 @@ export async function DELETE(
     }
 
     await prisma.workspace.delete({
-      where: { id: params.id },
+      where: { id }, // ✅ Usamos el id resuelto
     });
 
     return NextResponse.json({ success: true });
