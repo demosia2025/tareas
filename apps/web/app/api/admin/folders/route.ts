@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       select: { role: true }
     })
 
-    if (user?.role !== "super_admin" && user?.role !== "admin") {
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
     }
 
