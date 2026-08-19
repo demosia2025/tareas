@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Send, Paperclip, X, FileText, Check, Users, MessageSquare, UserPlus, Plus, Circle, ChevronRight, ArrowLeft } from "lucide-react";
 import AssigneeSelector from "@/components/AssigneeSelector";
-import TaskLabelsManager from "@/components/TaskLabelsManager";
+// import TaskLabelsManager from "@/components/TaskLabelsManager";
 
 interface TaskDetailModalProps {
   taskId: string;
