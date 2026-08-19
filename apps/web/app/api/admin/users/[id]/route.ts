@@ -4,32 +4,31 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ params ahora es una Promesa
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params; // ✅ Resolvemos la promesa para obtener el id
+    const { id } = await params;
     const session = await auth();
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const superAdminMember = await prisma.workspaceMember.findFirst({
-      where: {
-        userId: session.user.id,
-        role: "superadmin",
-      },
+    // ✅ CORREGIDO: Verificamos el rol global en el modelo User, no en WorkspaceMember
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
     });
 
-    if (!superAdminMember) {
-      return NextResponse.json({ error: "No eres super admin" }, { status: 403 });
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
     const body = await request.json();
     const { name, slug, plan, organizationId } = body;
 
     const updatedWorkspace = await prisma.workspace.update({
-      where: { id }, // ✅ Usamos el id resuelto
+      where: { id },
       data: {
         ...(name !== undefined && { name }),
         ...(slug !== undefined && { slug }),
@@ -46,29 +45,28 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ params ahora es una Promesa
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params; // ✅ Resolvemos la promesa para obtener el id
+    const { id } = await params;
     const session = await auth();
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const superAdminMember = await prisma.workspaceMember.findFirst({
-      where: {
-        userId: session.user.id,
-        role: "superadmin",
-      },
+    // ✅ CORREGIDO: Verificamos el rol global en el modelo User, no en WorkspaceMember
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
     });
 
-    if (!superAdminMember) {
-      return NextResponse.json({ error: "No eres super admin" }, { status: 403 });
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos de administrador" }, { status: 403 });
     }
 
     await prisma.workspace.delete({
-      where: { id }, // ✅ Usamos el id resuelto
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
