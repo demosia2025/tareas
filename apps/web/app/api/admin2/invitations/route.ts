@@ -13,7 +13,6 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -69,9 +68,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
     }
 
+    // ✅ CORREGIDO: Uso del campo 'invitedEmail' según el esquema Prisma
     const existingInvitation = await prisma.userInvitation.findFirst({
       where: {
-        email,
+        invitedEmail: email,
         workspaceId,
         status: "pending"
       }
@@ -81,9 +81,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ya existe una invitación pendiente para este email" }, { status: 400 });
     }
 
+    // ✅ CORREGIDO: Uso del campo 'invitedEmail' en la creación
     const invitation = await prisma.userInvitation.create({
       data: {
-        email,
+        invitedEmail: email,
         workspaceId,
         invitationType,
         inviterId: session.user.id,
