@@ -8,18 +8,14 @@ export async function GET(
 ) {
   try {
     const session = await auth();
-    
-    // ✅ 1. Verificamos explícitamente que session.user.id exista
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // ✅ 2. Guardamos el ID en una constante para que TypeScript sepa que es un string seguro
+    // ✅ 1. Guardamos el ID en una constante segura
     const currentUserId = session.user.id;
     const { workspaceid } = await params;
 
-    // ✅ CORRECCIÓN CLAVE: Usar findFirst en lugar de findUnique con compound ID 
-    // para evitar errores de naming en Prisma que hacían fallar la consulta en silencio.
     const membership = await prisma.workspaceMember.findFirst({
       where: {
         workspaceId: workspaceid,
@@ -31,7 +27,6 @@ export async function GET(
       return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
     }
 
-    // ✅ Obtener TODOS los miembros del workspace
     const members = await prisma.workspaceMember.findMany({
       where: { workspaceId: workspaceid },
       include: {
@@ -49,19 +44,18 @@ export async function GET(
       }
     });
 
-    // ✅ 3. Usamos la constante segura 'currentUserId' en lugar de session.user.id
     const users = members.map((m: any) => ({
       id: m.user.id,
       name: m.user.name || "Usuario",
       email: m.user.email,
       image: m.user.image,
       role: m.role,
-      isOnline: m.userId === currentUserId, // Simulación: solo el usuario actual aparece online
+      isOnline: m.userId === currentUserId,
       lastSeen: m.userId === currentUserId ? "Ahora" : "Hace 5 min"
     }));
 
-    // ✅ Ordenar: online primero
-    users.sort((a, b) => {
+    // ✅ 2. CORREGIDO: Agregar tipos 'any' a 'a' y 'b' en el sort para cumplir con TypeScript estricto
+    users.sort((a: any, b: any) => {
       if (a.isOnline && !b.isOnline) return -1;
       if (!a.isOnline && b.isOnline) return 1;
       return 0;
