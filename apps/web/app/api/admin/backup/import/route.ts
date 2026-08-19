@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Transacción ordenada para evitar errores de llaves foráneas
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       
       // 1️⃣ Usuarios
       for (const u of users) {
