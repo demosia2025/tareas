@@ -45,7 +45,7 @@ export async function GET(
       }
     });
 
-    const users = members.map((m) => ({
+    const users = members.map((m: any) => ({
       id: m.user.id,
       name: m.user.name || "Usuario",
       email: m.user.email,
