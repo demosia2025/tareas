@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 // GET: Obtener comentarios de la tarea
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ taskid: string }> }
+  { params }: { params: Promise<{ id: string }> } // ✅ Cambiado de 'taskid' a 'id' para coincidir con la carpeta [id]
 ) {
   try {
     const session = await auth()
@@ -13,10 +13,10 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    const { taskid } = await params
+    const { id } = await params // ✅ Desestructuramos 'id'
 
     const comments = await prisma.taskComment.findMany({
-      where: { taskId: taskid },
+      where: { taskId: id }, // ✅ Usamos 'id' aquí
       include: {
         user: {
           select: { id: true, name: true, email: true, image: true }
@@ -35,7 +35,7 @@ export async function GET(
 // POST: Crear un comentario o adjuntar archivo
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ taskid: string }> }
+  { params }: { params: Promise<{ id: string }> } // ✅ Cambiado de 'taskid' a 'id'
 ) {
   try {
     const session = await auth()
@@ -43,7 +43,7 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    const { taskid } = await params
+    const { id } = await params // ✅ Desestructuramos 'id'
     const body = await request.json()
     const { content, fileUrl, fileName } = body
 
@@ -53,7 +53,7 @@ export async function POST(
 
     const comment = await prisma.taskComment.create({
       data: {
-        taskId: taskid,
+        taskId: id, // ✅ Usamos 'id' aquí
         userId: session.user.id,
         content: content || "",
         fileUrl: fileUrl || null,
