@@ -14,9 +14,9 @@ export async function GET() {
       select: { role: true }
     })
 
-    if (user?.role !== "super_admin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
-    }
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+  return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
+}
 
     // Obtener todos los datos de forma segura
     const [users, workspaces, tasks] = await Promise.all([
