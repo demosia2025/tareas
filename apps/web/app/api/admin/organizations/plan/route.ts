@@ -31,7 +31,8 @@ export async function GET() {
         include: { members: true }
       });
 
-      const totalUsers = workspaces.reduce((acc, ws) => acc + ws.members.length, 0);
+      // ✅ CORREGIDO: Agregado ': any' a los parámetros
+      const totalUsers = workspaces.reduce((acc: any, ws: any) => acc + ws.members.length, 0);
 
       const planLimits: Record<string, { maxUsers: number; maxWorkspaces: number }> = {
         free: { maxUsers: 3, maxWorkspaces: 1 },
@@ -82,7 +83,8 @@ export async function GET() {
       include: { members: true }
     });
 
-    const totalUsers = workspaces.reduce((acc, ws) => acc + ws.members.length, 0);
+    // ✅ CORREGIDO: Agregado ': any' a los parámetros
+    const totalUsers = workspaces.reduce((acc: any, ws: any) => acc + ws.members.length, 0);
 
     const planLimits: Record<string, { maxUsers: number; maxWorkspaces: number }> = {
       free: { maxUsers: 3, maxWorkspaces: 1 },
