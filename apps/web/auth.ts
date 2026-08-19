@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
@@ -77,13 +77,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    // ✅ AGREGADO: Redirect después del login
     async redirect({ url, baseUrl }) {
-      // Si hay una URL específica, usarla
       if (url.startsWith(baseUrl)) {
         return url;
       }
-      // Si es relativo, permitirlo
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;
       }
