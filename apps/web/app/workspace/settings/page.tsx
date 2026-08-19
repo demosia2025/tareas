@@ -27,7 +27,7 @@ export default function WorkspaceSettingsPage() {
     const fetchWorkspace = async () => {
       try {
         const response = await fetch(
-          `/api/user/workspace?userId=${session.user.id}`
+          `/api/user/workspace?userId=${session?.user?.id || ""}`
         );
         const data = await response.json();
 
