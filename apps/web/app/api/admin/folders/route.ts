@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       select: { role: true }
     })
 
-    if (user?.role !== "super_admin" && user?.role !== "admin") {
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
     }
 
@@ -95,7 +95,7 @@ export async function PATCH(request: Request) {
       select: { role: true }
     })
 
-    if (user?.role !== "super_admin" && user?.role !== "admin") {
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
     }
 
@@ -143,7 +143,7 @@ export async function DELETE(request: Request) {
       select: { role: true }
     })
 
-    if (user?.role !== "super_admin" && user?.role !== "admin") {
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 })
     }
 
