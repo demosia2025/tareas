@@ -54,7 +54,7 @@ export default function DashboardPage() {
 
   const hasLoadedRef = useRef(false);
 
-  const userRole = (session?.user?.role || "").toLowerCase();
+     const userRole = ((session?.user as any)?.role || "").toLowerCase();
   const isAdmin = userRole === "admin" || userRole === "superadmin";
 
   useEffect(() => {
