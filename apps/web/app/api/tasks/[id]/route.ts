@@ -4,15 +4,17 @@ import { auth } from "@/auth";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ✅ CAMBIO 1: Agregar Promise
 ) {
   try {
+    const { id } = await params; // ✅ CAMBIO 2: Hacer await de params
+    
     const session = await auth();
     if (!session || !session.user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const taskId = params.id;
+    const taskId = id; // ✅ CAMBIO 3: Usar 'id' directamente en lugar de 'params.id'
     const body = await req.json();
     const { folderId, listId, spaceId } = body;
 
