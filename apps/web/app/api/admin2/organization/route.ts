@@ -13,9 +13,16 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+    const user = await prisma.user.findUnique({ 
+      where: { id: session.user.id }, 
+      select: { role: true } 
+    });
+    
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
@@ -42,9 +49,16 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+    const user = await prisma.user.findUnique({ 
+      where: { id: session.user.id }, 
+      select: { role: true } 
+    });
+    
     if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
