@@ -236,14 +236,17 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
               </div>
 
               {/* Administrador de Etiquetas */}
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-                <TaskLabelsManager
-                  taskId={currentTask.id}
-                  workspaceId={workspaceId}
-                  currentLabels={currentTaskLabels}
-                  onLabelsUpdated={(labels) => setCurrentTaskLabels(labels)}
-                />
-              </div>
+               {/* Administrador de Etiquetas - TEMPORALMENTE DESACTIVADO */}
+   {/* 
+   <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+     <TaskLabelsManager
+       taskId={currentTask.id}
+       workspaceId={workspaceId}
+       currentLabels={currentTaskLabels}
+       ...
+     />
+   </div>
+   */}
 
               {/* Invitación de Usuarios */}
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
