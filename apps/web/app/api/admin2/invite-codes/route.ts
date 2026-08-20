@@ -13,7 +13,6 @@ async function getAdminOrganization(userId: string) {
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -74,7 +73,8 @@ export async function POST(req: Request) {
       data: {
         code,
         maxUses,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        // ✅ CORREGIDO: Solo incluimos expiresAt si tiene un valor válido
+        ...(expiresAt && { expiresAt: new Date(expiresAt) }),
         workspaceId,
         createdById: session.user.id
       },
