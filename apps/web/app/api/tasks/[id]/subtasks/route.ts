@@ -67,7 +67,7 @@ export async function POST(
         title,
         description: description || null,
         status: "todo",
-        priority: 0,
+        priority: "low",
         creatorId: session.user.id
       }
     })
