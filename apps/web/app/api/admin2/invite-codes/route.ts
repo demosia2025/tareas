@@ -31,7 +31,6 @@ export async function GET(req: Request) {
       },
       include: {
         createdBy: { select: { name: true, email: true } },
-        usedBy: { select: { name: true, email: true } },
         workspace: { select: { name: true } }
       },
       orderBy: { createdAt: "desc" }
