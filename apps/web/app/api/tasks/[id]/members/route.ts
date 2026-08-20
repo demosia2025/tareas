@@ -13,7 +13,6 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // ✅ CORREGIDO: Desempaquetar params con await
     const { id: taskId } = await params;
 
     const taskMembers = await prisma.taskMember.findMany({
@@ -48,7 +47,6 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // ✅ CORREGIDO: Desempaquetar params con await
     const { id: taskId } = await params;
     const body = await req.json();
     const { userId, email } = body;
@@ -90,13 +88,11 @@ export async function POST(
       return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     }
 
-    // 2. Verificar si el usuario tiene membresía en el workspace
-    const existingMembership = await prisma.workspaceMember.findUnique({
+    // 2. ✅ CORREGIDO: Usar findFirst en lugar de clave compuesta
+    const existingMembership = await prisma.workspaceMember.findFirst({
       where: {
-        userId_workspaceId: {
-          userId: targetUserId,
-          workspaceId: task.workspaceId
-        }
+        userId: targetUserId,
+        workspaceId: task.workspaceId
       }
     });
 
@@ -112,13 +108,11 @@ export async function POST(
       console.log(`✅ Membresía creada automáticamente para usuario ${targetUserId} en workspace ${task.workspaceId}`);
     }
 
-    // 4. Verificar si ya es miembro de la tarea (evita duplicados)
-    const existingTaskMember = await prisma.taskMember.findUnique({
+    // 4. ✅ CORREGIDO: Usar findFirst en lugar de clave compuesta
+    const existingTaskMember = await prisma.taskMember.findFirst({
       where: {
-        userId_taskId: {
-          userId: targetUserId,
-          taskId: taskId
-        }
+        userId: targetUserId,
+        taskId: taskId
       }
     });
 
@@ -168,7 +162,6 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // ✅ CORREGIDO: Desempaquetar params con await
     const { id: taskId } = await params;
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
@@ -186,12 +179,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     }
 
-    const requesterMembership = await prisma.workspaceMember.findUnique({
+    // ✅ CORREGIDO: Usar findFirst en lugar de clave compuesta
+    const requesterMembership = await prisma.workspaceMember.findFirst({
       where: {
-        userId_workspaceId: {
-          userId: session.user.id,
-          workspaceId: task.workspaceId
-        }
+        userId: session.user.id,
+        workspaceId: task.workspaceId
       }
     });
 
@@ -201,12 +193,11 @@ export async function DELETE(
       }, { status: 403 });
     }
 
-    await prisma.taskMember.delete({
+    // ✅ CORREGIDO: Usar deleteMany con where simple en lugar de clave compuesta
+    await prisma.taskMember.deleteMany({
       where: {
-        userId_taskId: {
-          userId: userId,
-          taskId: taskId
-        }
+        userId: userId,
+        taskId: taskId
       }
     });
 
