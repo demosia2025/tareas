@@ -21,13 +21,13 @@ export async function POST(
       return NextResponse.json({ error: "userIds debe ser un array" }, { status: 400 });
     }
 
-    await prisma.taskAssignee.deleteMany({
+    await prisma.taskMember.deleteMany({
       where: { taskId: id } // ✅ Usamos el id resuelto
     });
 
     const assignees = await Promise.all(
       userIds.map((userId: string) =>
-        prisma.taskAssignee.create({
+        prisma.taskMember.create({
           data: { taskId: id, userId } // ✅ Usamos el id resuelto
         })
       )
@@ -52,7 +52,7 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const assignees = await prisma.taskAssignee.findMany({
+    const assignees = await prisma.taskMember.findMany({
       where: { taskId: id }, // ✅ Usamos el id resuelto
       include: {
         user: { select: { id: true, name: true, email: true } }
