@@ -44,7 +44,7 @@ export default function HomePage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  // ✅ NUEVO: Estado para todas las tareas del workspace
+  // ✅ ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
@@ -59,12 +59,18 @@ export default function HomePage() {
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
+  // 🔹 REDIRECCIÓN SEGURA DE AUTENTICACIÓN
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
+
   // ✅ CERRAR MENÚS AL HACER CLIC FUERA
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       
-      // Cerrar menú de perfil si se hace clic fuera
       if (dashboard.isProfileMenuOpen && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         dashboard.setIsProfileMenuOpen(false);
       }
@@ -86,7 +92,6 @@ export default function HomePage() {
       try {
         const allTasks: any[] = [];
         
-        // Recorrer todos los espacios y sus listas
         for (const space of dashboard.spaces) {
           if (space.lists) {
             for (const list of space.lists) {
@@ -111,7 +116,6 @@ export default function HomePage() {
           }
         }
 
-        // Ordenar por updatedAt (más reciente primero) y tomar las 5 primeras
         const sorted = allTasks
           .sort((a, b) => {
             const dateA = new Date(a.updatedAt || a.created_at || 0).getTime();
@@ -346,6 +350,7 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
+  // 🔹 PANTALLA DE CARGA MIENTRAS COMPRUEBA LA SESIÓN O EL DASHBOARD
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center">
@@ -357,8 +362,8 @@ export default function HomePage() {
     );
   }
 
+  // 🔹 EVITA MOSTRAR CONTENIDO CUANDO NO HAY SESIÓN Y SE REDIRIGE A LOGIN
   if (status === "unauthenticated") {
-    signIn();
     return null;
   }
 
@@ -372,14 +377,12 @@ export default function HomePage() {
               <Menu className="w-4 h-4" />
             </button>
             
-            {/* ✅ LOGO Y TÍTULO CLICKEABLE HACIA EL INICIO (CORREGIDO) */}
+            {/* LOGO Y TÍTULO */}
             <div 
               onClick={() => {
-                // Limpiar estado de lista seleccionada para forzar la vista de inicio
                 if (dashboard.selectedList) {
                   dashboard.setSelectedList(null);
                 }
-                // Navegar al inicio
                 router.push("/");
               }} 
               className="flex items-center gap-2.5 group cursor-pointer" 
@@ -409,7 +412,7 @@ export default function HomePage() {
               </Link>
             )}
 
-            {/* ✅ WORKSPACE SELECTOR CON REFERENCIA */}
+            {/* WORKSPACE SELECTOR */}
             {dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef}>
                 <WorkspaceSelector
@@ -452,7 +455,7 @@ export default function HomePage() {
               </Link>
             )}
             
-            {/* ✅ MENÚ DE PERFIL CON REFERENCIA */}
+            {/* MENÚ DE PERFIL */}
             <div className="relative" ref={profileMenuRef}>
               <button onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} className="flex items-center gap-2.5 px-2.5 py-1 rounded-xl hover:bg-slate-800/60 transition-all border border-slate-800/80 hover:border-slate-700/60 shadow-inner">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-cyan-500/20">
@@ -512,7 +515,6 @@ export default function HomePage() {
         
         <aside className={`absolute md:relative z-30 h-full w-64 flex-shrink-0 bg-slate-900/90 md:bg-slate-900/40 border-r border-slate-800/80 backdrop-blur-2xl transition-transform duration-300 ease-in-out flex flex-col overflow-hidden ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
           <div className="flex-1 overflow-y-auto">
-            {/* ✅ CORREGIDO: Agregado '|| ""' para asegurar que workspaceId sea siempre string */}
             <ClickUpSidebar 
               workspaceId={dashboard.workspaceId || ""} 
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
@@ -529,7 +531,6 @@ export default function HomePage() {
 
         <main className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
           {dashboard.selectedList ? (
-            // ✅ MODO LISTA SELECCIONADA
             <>
               <div className="px-4 sm:px-6 py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -613,10 +614,8 @@ export default function HomePage() {
               </div>
             </>
           ) : hasWorkspace ? (
-            // ✅ PANTALLA PRINCIPAL: DOS SECCIONES HORIZONTALES CON BORDE
             <div className="flex-1 overflow-y-auto p-6 lg:p-10">
               <div className="max-w-6xl mx-auto">
-                {/* ✅ TÍTULO GENERAL CENTRADO */}
                 <div className="text-center mb-10">
                   <h1 className="text-2xl font-bold text-white mb-2">¿Qué quieres hacer hoy?</h1>
                   <p className="text-xs text-slate-400">Elige una opción para continuar</p>
@@ -646,10 +645,10 @@ export default function HomePage() {
                             key={task.id}
                             onClick={() => {
                               const space = dashboard.spaces.find((s: any) => s.id === task.spaceId);
-   const list = space?.lists?.find((l: any) => l.id === task.listId);
+                              const list = space?.lists?.find((l: any) => l.id === task.listId);
                               if (list && space) {
                                 dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
-                                setTimeout(() =>    dashboard.openEditModal(task as any), 300);
+                                setTimeout(() => dashboard.openEditModal(task as any), 300);
                               }
                             }}
                             className="w-full text-left p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
@@ -715,7 +714,6 @@ export default function HomePage() {
                     </div>
 
                     <div className="space-y-2.5">
-                      {/* CREAR WORKSPACE - AMBER */}
                       <button
                         onClick={() => {
                           if (!canCreateWorkspace) {
@@ -742,7 +740,6 @@ export default function HomePage() {
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
                       </button>
 
-                      {/* CREAR ESPACIO - PURPLE */}
                       <button
                         onClick={() => setIsCreateSpaceModalOpen(true)}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
@@ -757,7 +754,6 @@ export default function HomePage() {
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
                       </button>
 
-                      {/* CREAR CARPETA - INDIGO */}
                       <button
                         onClick={() => setIsCreateFolderModalOpen(true)}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
@@ -772,7 +768,6 @@ export default function HomePage() {
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
                       </button>
 
-                      {/* CREAR TAREA - CYAN */}
                       <button
                         onClick={handleCreateTaskFromHome}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
@@ -792,7 +787,6 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            // ✅ PANTALLA INICIAL SIN WORKSPACE
             <div className="h-full flex items-center justify-center p-6">
               <div className="text-center max-w-sm p-8 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-2xl shadow-xl shadow-cyan-500/5">
                 <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto mb-4 text-cyan-400 shadow-lg"><Layers className="w-6 h-6" /></div>
@@ -807,9 +801,9 @@ export default function HomePage() {
 
       {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
-      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() =>    dashboard.openEditModal(task as any), 100); } }} />
+      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
-      {/* ✅ MODAL: CREAR WORKSPACE */}
+      {/* MODAL: CREAR WORKSPACE */}
       {isCreateWorkspaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -852,7 +846,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ✅ MODAL: CREAR ESPACIO */}
+      {/* MODAL: CREAR ESPACIO */}
       {isCreateSpaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -895,7 +889,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ✅ MODAL: CREAR TAREA */}
+      {/* MODAL: CREAR TAREA */}
       {isCreateTaskModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -946,7 +940,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ✅ MODAL: CREAR CARPETA */}
+      {/* MODAL: CREAR CARPETA */}
       {isCreateFolderModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1008,7 +1002,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ✅ MODAL: Unirme a Workspace */}
+      {/* MODAL: UNIRME A WORKSPACE */}
       {dashboard.isJoinModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1073,7 +1067,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ✅ MODAL: Confirmación de Logout */}
+      {/* MODAL: LOGOUT */}
       {dashboard.isLogoutModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
