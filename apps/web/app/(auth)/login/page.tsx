@@ -1,10 +1,11 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Zap, Mail, Lock, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -16,7 +17,6 @@ export default function LoginPage() {
   // Verificar si ya hay sesión
   useEffect(() => {
     if (status === "authenticated") {
-      // Redirigir al home principal (que maneja la lógica de workspace/onboarding)
       router.push("/");
     }
   }, [status, router]);
@@ -46,9 +46,6 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Correo electrónico o contraseña incorrectos. Por favor, verifica tus datos e inténtalo de nuevo.");
         setIsLoading(false);
-      } else {
-        // El useEffect detectará el cambio de sesión y redirigirá
-        // No hacemos router.push aquí para evitar conflictos
       }
     } catch (err) {
       setError("Ocurrió un error de conexión. Inténtalo más tarde.");
@@ -56,11 +53,10 @@ export default function LoginPage() {
     }
   };
 
-  // No renderizar si está cargando la sesión
   if (status === "loading") {
     return (
       <div className="min-h-screen w-full bg-[#06080F] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-3 border-cyan-400 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent"></div>
       </div>
     );
   }
