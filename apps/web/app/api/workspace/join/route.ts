@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ CORREGIDO: Buscar por slug normalizado (minúsculas y sin espacios)
+    // Buscar por slug normalizado
     const normalizedSlug = workspaceSlug.toLowerCase().trim().replace(/\s+/g, '-');
     
     const workspace = await prisma.workspace.findFirst({
@@ -53,20 +53,20 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-   // Verificar si el código ya fue utilizado
-   if (invite.usedAt) {
-     return NextResponse.json(
-       { error: "Este código de invitación ya ha sido utilizado" },
-       { status: 400 }
-     );
-   }
-    // Verificar si ya es miembro
-    const existingMember = await prisma.workspaceMember.findUnique({
+
+    // Verificar si el código ya fue utilizado
+    if (invite.usedAt) {
+      return NextResponse.json(
+        { error: "Este código de invitación ya ha sido utilizado" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ CORREGIDO: Usar findFirst para evitar errores de claves compuestas en Prisma
+    const existingMember = await prisma.workspaceMember.findFirst({
       where: {
-        workspaceId_userId: {
-          workspaceId: workspace.id,
-          userId,
-        },
+        workspaceId: workspace.id,
+        userId,
       },
     });
 
@@ -82,18 +82,16 @@ export async function POST(request: Request) {
       data: {
         workspaceId: workspace.id,
         userId,
-        role: "MEMBER",
+        role: "member", // ✅ CORREGIDO: minúsculas para coincidir con el enum WorkspaceRole
       },
     });
 
-    // Actualizar invitación (incrementar usedCount)
+    // ✅ CORREGIDO: WorkspaceInvite no tiene usedCount, usa usedAt y usedBy
     await prisma.workspaceInvite.update({
       where: { code: inviteCode },
       data: {
-        usedCount: { increment: 1 },
-        usedBy: {
-          connect: { id: userId }
-        }
+        usedAt: new Date(),
+        usedBy: userId,
       },
     });
 
@@ -102,10 +100,10 @@ export async function POST(request: Request) {
       workspaceId: workspace.id,
       workspaceName: workspace.name,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error uniéndose al workspace:", error);
     return NextResponse.json(
-      { error: "Error al unirse al workspace" },
+      { error: error.message || "Error al unirse al workspace" },
       { status: 500 }
     );
   }
