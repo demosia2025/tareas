@@ -53,15 +53,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    // Verificar max uses
-    if (invite.maxUses && invite.usedCount >= invite.maxUses) {
-      return NextResponse.json(
-        { error: "Este código ha alcanzado su límite de usos" },
-        { status: 400 }
-      );
-    }
-
+   // Verificar si el código ya fue utilizado
+   if (invite.usedAt) {
+     return NextResponse.json(
+       { error: "Este código de invitación ya ha sido utilizado" },
+       { status: 400 }
+     );
+   }
     // Verificar si ya es miembro
     const existingMember = await prisma.workspaceMember.findUnique({
       where: {
