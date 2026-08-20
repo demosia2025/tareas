@@ -8,7 +8,7 @@ async function getAdminOrganization(userId: string) {
     where: { userId, role: { in: ["admin", "owner"] } },
     include: { workspace: { select: { organizationId: true } } }
   });
-  return membership?.workspace?.organizationId;
+  return membership?.workspace?.organizationId || undefined;
 }
 
 export async function GET(req: Request) {
@@ -130,8 +130,9 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
       }
 
-      const existingMembership = await prisma.workspaceMember.findUnique({
-        where: { userId_workspaceId: { userId: id, workspaceId } }
+      // ✅ CORREGIDO: Usamos findFirst en lugar de la clave compuesta que causaba el error
+      const existingMembership = await prisma.workspaceMember.findFirst({
+        where: { userId: id, workspaceId }
       });
 
       if (!existingMembership) {
