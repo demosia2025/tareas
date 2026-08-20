@@ -80,14 +80,12 @@ export async function getUserRoleInWorkspace(
   userId: string, 
   workspaceId: string
 ): Promise<string | null> {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: {
-      userId_workspaceId: {
-        userId,
-        workspaceId
-      }
-    }
-  });
+    const membership = await prisma.workspaceMember.findFirst({
+     where: {
+       userId,
+       workspaceId
+     }
+   });
 
   return membership?.role || null;
 }
