@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-async function getAdminOrganization(userId: string) {
+// ✅ CORREGIDO: Especificamos que devuelve string | undefined (nunca null)
+async function getAdminOrganization(userId: string): Promise<string | undefined> {
   const membership = await prisma.workspaceMember.findFirst({
     where: { userId, role: { in: ["admin", "owner"] } },
     include: { workspace: { select: { organizationId: true } } }
   });
-  return membership?.workspace?.organizationId;
+  // Convertimos null a undefined para que Prisma lo acepte en el 'where'
+  return membership?.workspace?.organizationId || undefined;
 }
 
 export async function GET(req: Request) {
   try {
     const session = await auth();
-    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -29,6 +30,11 @@ export async function GET(req: Request) {
 
     const adminOrgId = await getAdminOrganization(session.user.id);
     
+    // ✅ CORREGIDO: Validamos que exista antes de hacer la consulta a Prisma
+    if (!adminOrgId) {
+      return NextResponse.json({ error: "No tienes una organización asignada" }, { status: 404 });
+    }
+
     const organization = await prisma.organization.findUnique({
       where: { id: adminOrgId },
       include: {
@@ -49,7 +55,6 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await auth();
-    // ✅ CORREGIDO: Verificamos explícitamente session.user.id
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
@@ -65,6 +70,11 @@ export async function PUT(req: Request) {
 
     const adminOrgId = await getAdminOrganization(session.user.id);
     
+    // ✅ CORREGIDO: Validamos que exista antes de hacer la actualización
+    if (!adminOrgId) {
+      return NextResponse.json({ error: "No tienes una organización asignada" }, { status: 404 });
+    }
+
     const body = await req.json();
     const { name, description, plan } = body;
 
