@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { Task } from "@/components/InlineTaskRow";
 
 export interface ListData {
@@ -45,7 +45,6 @@ export function useDashboard() {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  // ✅ MULTI-TENANT Y LOGIN
   const [memberships, setMemberships] = useState<any[]>([]);
   const [isWsDropdownOpen, setIsWsDropdownOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
@@ -54,7 +53,6 @@ export function useDashboard() {
   const [isJoining, setIsJoining] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
-  // ✅ NUEVOS ESTADOS PARA LÍMITES Y ROLES
   const [isOwner, setIsOwner] = useState(false);
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [planLimitModal, setPlanLimitModal] = useState({
@@ -65,60 +63,101 @@ export function useDashboard() {
     limit: 3
   });
 
-     const rawRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
+  const rawRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
   const isAdmin = rawRole === "admin";
-  const isSuperAdmin = rawRole === "superadmin" || rawRole === "superadmin";
+  const isSuperAdmin = rawRole === "superadmin";
 
+  // ✅ SOLUCIÓN DEFINITIVA: useEffect blindado
   useEffect(() => {
-    if (status === "unauthenticated") return;
-    
+    let isMounted = true; // Previene actualizaciones de estado en componente desmontado
+
     const fetchWorkspace = async () => {
-      if (!session?.user?.id) return;
+      // 1. Si está cargando la sesión, mantenemos loading en true
+      if (status === "loading") {
+        if (isMounted) setLoading(true);
+        return;
+      }
+
+      // 2. Si no está autenticado, detenemos loading y no hacemos nada
+      if (status === "unauthenticated") {
+        if (isMounted) setLoading(false);
+        return;
+      }
+
+      // 3. PROTECCIÓN CRÍTICA: Si está autenticado pero NO hay user.id, la sesión está corrupta.
+      // Forzamos el cierre de sesión en lugar de colgar la app.
+      if (status === "authenticated" && !session?.user?.id) {
+        console.error("[useDashboard] Sesión corrupta: autenticado pero sin user.id. Cerrando sesión.");
+        if (isMounted) setLoading(false);
+        await signOut({ redirect: true, callbackUrl: "/login" });
+        return;
+      }
+
       try {
-        const response = await fetch(`/api/user/workspace?userId=${session.user.id}`);
-        const data = await response.json();
+        console.log("[useDashboard] Iniciando fetch de workspace para:", session!.user!.id);
+        const response = await fetch(`/api/user/workspace?userId=${session!.user!.id}`);
         
-        if (data.memberships && data.memberships.length > 0) {
-          setMemberships(data.memberships);
-          
-          const activeWs = localStorage.getItem("activeWorkspaceId");
-          const isValid = data.memberships.some((m: any) => m.workspaceId === activeWs);
-          const targetWs = isValid ? activeWs : data.memberships[0].workspaceId;
-          
-          localStorage.setItem("activeWorkspaceId", targetWs);
-          setWorkspaceId(targetWs);
-        } else {
-          router.push('/onboarding');
+        if (!response.ok) {
+          throw new Error(`Error HTTP: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log("[useDashboard] Datos de workspace recibidos:", data);
+
+        if (isMounted) {
+          if (data.memberships && data.memberships.length > 0) {
+            setMemberships(data.memberships);
+            
+            const activeWs = localStorage.getItem("activeWorkspaceId");
+            const isValid = data.memberships.some((m: any) => m.workspaceId === activeWs);
+            const targetWs = isValid ? activeWs : data.memberships[0].workspaceId;
+            
+            localStorage.setItem("activeWorkspaceId", targetWs);
+            setWorkspaceId(targetWs);
+          } else {
+            // No tiene memberships, redirigir a onboarding
+            router.push('/onboarding');
+          }
         }
       } catch (error) {
-        console.error("Error fetching workspace:", error);
+        console.error("[useDashboard] Error crítico fetching workspace:", error);
+        // En caso de error, también debemos mostrar algo o redirigir, pero NUNCA colgar el loading
+        if (isMounted) {
+          // Opcional: Mostrar un estado de error en UI, por ahora solo liberamos el loading
+          setLoading(false); 
+        }
       } finally {
-        setLoading(false);
+        // ✅ GARANTÍA: Esto SIEMPRE se ejecuta, evitando el loading infinito
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    
-    if (status === "authenticated") fetchWorkspace();
+
+    fetchWorkspace();
+
+    // Cleanup function profesional
+    return () => {
+      isMounted = false;
+    };
   }, [session, status, router]);
 
   // ✅ VERIFICAR SI ES OWNER Y OBTENER INFO DEL PLAN
   useEffect(() => {
+    if (!workspaceId || !session?.user?.id) return;
+
     const fetchWorkspaceDetails = async () => {
-      if (!workspaceId) return;
       try {
-        // 1. Verificar si es owner
         const membersRes = await fetch(`/api/workspace/${workspaceId}/members`);
         if (membersRes.ok) {
-          // ✅ CORREGIDO: Agregado 'as any' para evitar error de tipo en TypeScript
-          const members = await (membersRes as any).json();
+          const members = await membersRes.json();
           const currentMember = members.find((m: any) => m.userId === session?.user?.id);
           setIsOwner(currentMember?.role === "owner");
         }
 
-        // 2. Obtener info del plan
         const planRes = await fetch(`/api/workspace/${workspaceId}/plan`);
         if (planRes.ok) {
-          // ✅ CORREGIDO: Agregado 'as any' para evitar error de tipo en TypeScript
-          const data = await (planRes as any).json();
+          const data = await planRes.json();
           setPlanInfo(data);
         }
       } catch (error) {
@@ -129,7 +168,7 @@ export function useDashboard() {
     fetchWorkspaceDetails();
   }, [workspaceId, session?.user?.id]);
 
-  const fetchHierarchy = async () => {
+  const fetchHierarchy = useCallback(async () => {
     if (!workspaceId) return;
     try {
       const response = await fetch(`/api/workspace/${workspaceId}/hierarchy`);
@@ -137,110 +176,189 @@ export function useDashboard() {
     } catch (error) {
       console.error("Error loading hierarchy:", error);
     }
-  };
+  }, [workspaceId]);
 
-  useEffect(() => { if (workspaceId) fetchHierarchy(); }, [workspaceId]);
+  useEffect(() => { 
+    if (workspaceId) fetchHierarchy(); 
+  }, [workspaceId, fetchHierarchy]);
   
   useEffect(() => {
-    if (selectedList?.id) { loadTasks(selectedList.id); fetchCustomFields(selectedList.id); } 
-    else { setTasks([]); setCustomFields([]); }
+    if (selectedList?.id) { 
+      loadTasks(selectedList.id); 
+      fetchCustomFields(selectedList.id); 
+    } else { 
+      setTasks([]); 
+      setCustomFields([]); 
+    }
   }, [selectedList?.id]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setIsPaletteOpen(prev => !prev); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { 
+        e.preventDefault(); 
+        setIsPaletteOpen(prev => !prev); 
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const loadTasks = async (listId: string) => {
+  const loadTasks = useCallback(async (listId: string) => {
     try {
       const response = await fetch(`/api/tasks?listId=${listId}`);
       if (response.ok) setTasks(await response.json());
-    } catch (error) { console.error("Error loading tasks:", error); }
-  };
+    } catch (error) { 
+      console.error("Error loading tasks:", error); 
+    }
+  }, []);
 
-  const fetchCustomFields = async (listId: string) => {
+  const fetchCustomFields = useCallback(async (listId: string) => {
     try {
       const response = await fetch(`/api/custom-fields?listId=${listId}`);
       setCustomFields((await response.json()) || []);
-    } catch (error) { setCustomFields([]); }
-  };
+    } catch (error) { 
+      setCustomFields([]); 
+    }
+  }, []);
 
-  const handleListSelect = (list: { id: string; name: string; spaceId: string; folderId?: string }) => {
+  const handleListSelect = useCallback((list: { id: string; name: string; spaceId: string; folderId?: string }) => {
     setSelectedList({ id: list.id, name: list.name, tasks: [] });
     loadTasks(list.id);
     setIsSidebarOpen(false);
-  };
+  }, [loadTasks]);
 
-  const toggleTaskExpand = (id: string) => {
-    setExpandedTasks(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  };
+  const toggleTaskExpand = useCallback((id: string) => {
+    setExpandedTasks(prev => { 
+      const n = new Set(prev); 
+      n.has(id) ? n.delete(id) : n.add(id); 
+      return n; 
+    });
+  }, []);
 
-  const handleCreateTask = async (taskData: any) => {
+  const handleCreateTask = useCallback(async (taskData: any) => {
     setIsSyncing(true);
     try {
-      const response = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
+      const response = await fetch('/api/tasks', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(taskData) 
+      });
       if (response.ok && selectedList) await loadTasks(selectedList.id);
-    } catch (error) { console.error("Error creating task:", error); } finally { setIsSyncing(false); }
-  };
+    } catch (error) { 
+      console.error("Error creating task:", error); 
+    } finally { 
+      setIsSyncing(false); 
+    }
+  }, [selectedList, loadTasks]);
 
-  const handleUpdateTask = async (taskData: any) => {
+  const handleUpdateTask = useCallback(async (taskData: any) => {
     setIsSyncing(true);
     try {
-      const response = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
+      const response = await fetch('/api/tasks', { 
+        method: 'PUT', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(taskData) 
+      });
       if (response.ok && selectedList) await loadTasks(selectedList.id);
-    } catch (error) { console.error("Error updating task:", error); } finally { setIsSyncing(false); }
-  };
+    } catch (error) { 
+      console.error("Error updating task:", error); 
+    } finally { 
+      setIsSyncing(false); 
+    }
+  }, [selectedList, loadTasks]);
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = useCallback(async (taskId: string) => {
     if (!confirm('¿Eliminar esta tarea y todas sus subtareas?')) return;
     setIsSyncing(true);
     try {
       const response = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' });
       if (response.ok && selectedList) await loadTasks(selectedList.id);
-    } catch (error) { console.error("Error deleting task:", error); } finally { setIsSyncing(false); }
-  };
+    } catch (error) { 
+      console.error("Error deleting task:", error); 
+    } finally { 
+      setIsSyncing(false); 
+    }
+  }, [selectedList, loadTasks]);
 
-  const openCreateModal = () => { setEditingTask(null); setParentTaskForSubtask(null); setIsModalOpen(true); };
-  const openEditModal = (task: Task) => { setEditingTask(task); setParentTaskForSubtask(null); setIsModalOpen(true); };
-  const openCreateSubtaskModal = (parentId: string) => { setEditingTask(null); setParentTaskForSubtask(parentId); setIsModalOpen(true); };
+  const openCreateModal = useCallback(() => { 
+    setEditingTask(null); 
+    setParentTaskForSubtask(null); 
+    setIsModalOpen(true); 
+  }, []);
 
-  const handleSaveWithParent = async (taskData: any) => {
+  const openEditModal = useCallback((task: Task) => { 
+    setEditingTask(task); 
+    setParentTaskForSubtask(null); 
+    setIsModalOpen(true); 
+  }, []);
+
+  const openCreateSubtaskModal = useCallback((parentId: string) => { 
+    setEditingTask(null); 
+    setParentTaskForSubtask(parentId); 
+    setIsModalOpen(true); 
+  }, []);
+
+  const handleSaveWithParent = useCallback(async (taskData: any) => {
     if (parentTaskForSubtask) taskData.parentTaskId = parentTaskForSubtask;
     if (editingTask) await handleUpdateTask({ ...taskData, id: editingTask.id });
     else await handleCreateTask(taskData);
     setIsModalOpen(false);
-  };
+  }, [parentTaskForSubtask, editingTask, handleUpdateTask, handleCreateTask]);
 
-  const createFirstList = async () => {
+  const createFirstList = useCallback(async () => {
     if (!workspaceId || spaces.length === 0) return;
     setIsSyncing(true);
     try {
-      const response = await fetch('/api/lists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Mi Primera Lista', workspaceId: workspaceId, spaceId: spaces[0].id }) });
+      const response = await fetch('/api/lists', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ name: 'Mi Primera Lista', workspaceId: workspaceId, spaceId: spaces[0].id }) 
+      });
       if (response.ok) {
         await fetchHierarchy();
         const updatedSpaces = await fetch(`/api/workspace/${workspaceId}/hierarchy`).then(res => res.json());
         const newList = updatedSpaces[0]?.lists?.[0];
-        if (newList) { setSelectedList({ id: newList.id, name: newList.name, tasks: [] }); loadTasks(newList.id); }
+        if (newList) { 
+          setSelectedList({ id: newList.id, name: newList.name, tasks: [] }); 
+          loadTasks(newList.id); 
+        }
       }
-    } catch (error) { console.error("Error creating first list:", error); } finally { setIsSyncing(false); }
-  };
+    } catch (error) { 
+      console.error("Error creating first list:", error); 
+    } finally { 
+      setIsSyncing(false); 
+    }
+  }, [workspaceId, spaces, fetchHierarchy, loadTasks]);
 
-  const handleOpenFolderModal = (spaceId: string) => { setTargetSpaceIdForFolder(spaceId); setNewFolderName(""); setIsFolderModalOpen(true); };
+  const handleOpenFolderModal = useCallback((spaceId: string) => { 
+    setTargetSpaceIdForFolder(spaceId); 
+    setNewFolderName(""); 
+    setIsFolderModalOpen(true); 
+  }, []);
 
-  const handleCreateFolder = async (e: React.FormEvent) => {
+  const handleCreateFolder = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim() || !targetSpaceIdForFolder || !workspaceId) return;
     setIsSyncing(true);
     try {
-      const response = await fetch('/api/folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newFolderName.trim(), spaceId: targetSpaceIdForFolder, workspaceId: workspaceId }) });
-      if (response.ok) { await fetchHierarchy(); setIsFolderModalOpen(false); setNewFolderName(""); }
-    } catch (error) { console.error("Error creating folder:", error); } finally { setIsSyncing(false); }
-  };
+      const response = await fetch('/api/folders', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ name: newFolderName.trim(), spaceId: targetSpaceIdForFolder, workspaceId: workspaceId }) 
+      });
+      if (response.ok) { 
+        await fetchHierarchy(); 
+        setIsFolderModalOpen(false); 
+        setNewFolderName(""); 
+      }
+    } catch (error) { 
+      console.error("Error creating folder:", error); 
+    } finally { 
+      setIsSyncing(false); 
+    }
+  }, [newFolderName, targetSpaceIdForFolder, workspaceId, fetchHierarchy]);
 
-  const handleJoinWorkspace = async (e: React.FormEvent) => {
+  const handleJoinWorkspace = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsJoining(true);
     setJoinError("");
@@ -268,7 +386,7 @@ export function useDashboard() {
     } finally {
       setIsJoining(false);
     }
-  };
+  }, [joinForm, session?.user?.id]);
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter(task => {
@@ -319,15 +437,12 @@ export function useDashboard() {
     parentTaskForSubtask, isPaletteOpen, searchQuery, statusFilter, priorityFilter, sortOption, isFilterDropdownOpen,
     isProfileMenuOpen, isAdmin, isSuperAdmin, filteredTasks, hierarchicalTasks, allWorkspaceTasks,
     memberships, isWsDropdownOpen, isJoinModalOpen, joinForm, joinError, isJoining, isLogoutModalOpen,
-    // ✅ NUEVOS RETORNOS
     isOwner, planInfo, planLimitModal, setPlanLimitModal,
-    // ✅ NUEVOS SETTERS
     setWorkspaceId, setSelectedList, setViewMode, setExpandedTasks, setCustomFields, setSpaces, setIsSyncing,
     setIsFolderModalOpen, setTargetSpaceIdForFolder, setNewFolderName, setIsSidebarOpen, setIsModalOpen, setEditingTask,
     setParentTaskForSubtask, setIsPaletteOpen, setSearchQuery, setStatusFilter, setPriorityFilter, setSortOption,
     setIsFilterDropdownOpen, setIsProfileMenuOpen, setIsWsDropdownOpen, setIsJoinModalOpen, setJoinForm, setJoinError, 
     setIsJoining, setIsLogoutModalOpen,
-    // ✅ FUNCIONES
     fetchHierarchy, loadTasks, handleListSelect, toggleTaskExpand,
     handleCreateTask, handleUpdateTask, handleDeleteTask, openCreateModal, openEditModal, openCreateSubtaskModal,
     handleSaveWithParent, createFirstList, handleOpenFolderModal, handleCreateFolder, handleJoinWorkspace
