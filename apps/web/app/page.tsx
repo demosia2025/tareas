@@ -1,4 +1,5 @@
 "use client";
+
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export default function HomePage() {
   const router = useRouter();
   const dashboard = useDashboard();
 
-  // ✅ ESTADOS PARA MODALES DE CREACIÓN RÁPIDA
+  // ESTADOS PARA MODALES DE CREACIÓN RÁPIDA
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -44,29 +45,29 @@ export default function HomePage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  // ✅ ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
+  // ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
-  // ✅ REFERENCIAS PARA LOS MENÚS
+  // REFERENCIAS PARA LOS MENÚS
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
-  // ✅ DETECCIÓN SIMPLIFICADA
+  // DETECCIÓN SIMPLIFICADA
   const hasWorkspace = dashboard.workspaceId !== null;
 
-  // ✅ VERIFICAR LÍMITES
+  // VERIFICAR LÍMITES
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
-  // 🔹 REDIRECCIÓN SEGURA DE AUTENTICACIÓN
+  // REDIRECCIÓN SEGURA DE AUTENTICACIÓN
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
-  // ✅ CERRAR MENÚS AL HACER CLIC FUERA
+  // CERRAR MENÚS AL HACER CLIC FUERA
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -80,41 +81,45 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dashboard.isProfileMenuOpen]);
 
-  // ✅ OBTENER TODAS LAS TAREAS DE TODAS LAS LISTAS DEL WORKSPACE
+  // OBTENER TAREAS EN PARALELO SIN CONGELAR LA PÁGINA
   useEffect(() => {
     const fetchAllTasks = async () => {
-      if (!dashboard.workspaceId || dashboard.spaces.length === 0) {
+      if (!dashboard.workspaceId || !dashboard.spaces || dashboard.spaces.length === 0) {
         setAllRecentTasks([]);
+        setIsLoadingAllTasks(false);
         return;
       }
 
       setIsLoadingAllTasks(true);
       try {
-        const allTasks: any[] = [];
-        
+        const fetchPromises: Promise<any>[] = [];
+
         for (const space of dashboard.spaces) {
           if (space.lists) {
             for (const list of space.lists) {
-              try {
-                const res = await fetch(`/api/tasks?listId=${list.id}`);
-                if (res.ok) {
-                  const tasks = await res.json();
-                  tasks.forEach((task: any) => {
-                    allTasks.push({
-                      ...task,
-                      listId: list.id,
-                      listName: list.name,
-                      spaceId: space.id,
-                      spaceName: space.name
-                    });
-                  });
-                }
-              } catch (err) {
-                console.error(`Error fetching tasks for list ${list.id}:`, err);
-              }
+              fetchPromises.push(
+                fetch(`/api/tasks?listId=${list.id}`)
+                  .then(async (res) => {
+                    if (res.ok) {
+                      const tasks = await res.json();
+                      return tasks.map((task: any) => ({
+                        ...task,
+                        listId: list.id,
+                        listName: list.name,
+                        spaceId: space.id,
+                        spaceName: space.name
+                      }));
+                    }
+                    return [];
+                  })
+                  .catch(() => [])
+              );
             }
           }
         }
+
+        const results = await Promise.all(fetchPromises);
+        const allTasks = results.flat();
 
         const sorted = allTasks
           .sort((a, b) => {
@@ -135,7 +140,7 @@ export default function HomePage() {
     fetchAllTasks();
   }, [dashboard.workspaceId, dashboard.spaces]);
 
-  // ✅ FUNCIONES DE CREACIÓN
+  // FUNCIONES DE CREACIÓN
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
@@ -350,7 +355,7 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
-  // 🔹 PANTALLA DE CARGA MIENTRAS COMPRUEBA LA SESIÓN O EL DASHBOARD
+  // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center">
@@ -362,7 +367,7 @@ export default function HomePage() {
     );
   }
 
-  // 🔹 EVITA MOSTRAR CONTENIDO CUANDO NO HAY SESIÓN Y SE REDIRIGE A LOGIN
+  // EVITA MOSTRAR CONTENIDO SI NO HAY SESIÓN
   if (status === "unauthenticated") {
     return null;
   }
@@ -413,7 +418,7 @@ export default function HomePage() {
             )}
 
             {/* WORKSPACE SELECTOR */}
-            {dashboard.memberships.length > 0 && (
+            {dashboard.memberships && dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef}>
                 <WorkspaceSelector
                   memberships={dashboard.memberships}
@@ -539,7 +544,7 @@ export default function HomePage() {
                       {dashboard.isSyncing ? <><RefreshCw className="w-3 h-3 animate-spin" /><span>Sincronizando...</span></> : <><Sparkles className="w-3 h-3 animate-pulse" /><span>Activa</span></>}
                     </div>
                     <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2 truncate">{dashboard.selectedList.name}</h1>
-                    <p className="text-[11px] text-slate-400 font-light">{dashboard.filteredTasks.length} {dashboard.filteredTasks.length === 1 ? 'tarea en curso' : 'tareas en curso'}</p>
+                    <p className="text-[11px] text-slate-400 font-light">{dashboard.filteredTasks?.length || 0} {(dashboard.filteredTasks?.length === 1) ? 'tarea en curso' : 'tareas en curso'}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button onClick={() => dashboard.setIsPaletteOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all shadow-sm group">
@@ -601,15 +606,15 @@ export default function HomePage() {
                 {dashboard.viewMode === "list" ? (
                   <div className="max-w-4xl mx-auto w-full overflow-y-auto flex-1 pr-1">
                     <div className="space-y-1.5">
-                      {dashboard.hierarchicalTasks.map((task) => (
+                      {dashboard.hierarchicalTasks?.map((task) => (
                         <InlineTaskRow key={task.id} task={task} depth={0} expandedTasks={dashboard.expandedTasks} customFields={dashboard.customFields} onToggleExpand={dashboard.toggleTaskExpand} onToggleStatus={(id, status) => dashboard.handleUpdateTask({ id, status })} onEdit={dashboard.openEditModal} onDelete={dashboard.handleDeleteTask} onCreateSubtask={dashboard.openCreateSubtaskModal} />
                       ))}
                     </div>
                   </div>
                 ) : dashboard.viewMode === "kanban" ? (
-                  <div className="h-full overflow-x-auto flex-1"><KanbanBoard tasks={dashboard.filteredTasks} onUpdateStatus={async (taskId, newStatus) => { await dashboard.handleUpdateTask({ id: taskId, status: newStatus }); }} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="h-full overflow-x-auto flex-1"><KanbanBoard tasks={dashboard.filteredTasks || []} onUpdateStatus={async (taskId, newStatus) => { await dashboard.handleUpdateTask({ id: taskId, status: newStatus }); }} onEditTask={dashboard.openEditModal} /></div>
                 ) : (
-                  <div className="h-full flex-1 flex flex-col overflow-hidden"><FunctionalCalendarView tasks={dashboard.filteredTasks} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="h-full flex-1 flex flex-col overflow-hidden"><FunctionalCalendarView tasks={dashboard.filteredTasks || []} onEditTask={dashboard.openEditModal} /></div>
                 )}
               </div>
             </>
@@ -644,7 +649,7 @@ export default function HomePage() {
                           <button
                             key={task.id}
                             onClick={() => {
-                              const space = dashboard.spaces.find((s: any) => s.id === task.spaceId);
+                              const space = dashboard.spaces?.find((s: any) => s.id === task.spaceId);
                               const list = space?.lists?.find((l: any) => l.id === task.listId);
                               if (list && space) {
                                 dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
@@ -720,9 +725,9 @@ export default function HomePage() {
                             dashboard.setPlanLimitModal({
                               isOpen: true,
                               type: "workspaces",
-                              currentPlan: dashboard.planInfo.planName,
-                              currentCount: dashboard.planInfo.workspaceCount,
-                              limit: dashboard.planInfo.workspaceLimit
+                              currentPlan: dashboard.planInfo?.planName || "Free",
+                              currentCount: dashboard.planInfo?.workspaceCount || 0,
+                              limit: dashboard.planInfo?.workspaceLimit || 0
                             });
                           } else {
                             setIsCreateWorkspaceModalOpen(true);
@@ -801,7 +806,7 @@ export default function HomePage() {
 
       {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
-      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
+      <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
       {/* MODAL: CREAR WORKSPACE */}
       {isCreateWorkspaceModalOpen && (
@@ -900,7 +905,7 @@ export default function HomePage() {
               </button>
             </div>
             <form onSubmit={handleCreateTask} className="space-y-4">
-              {dashboard.spaces.length > 0 ? (
+              {dashboard.spaces && dashboard.spaces.length > 0 ? (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">Seleccionar Espacio</label>
                   <select
@@ -951,7 +956,7 @@ export default function HomePage() {
               </button>
             </div>
             <form onSubmit={handleCreateFolder} className="space-y-4">
-              {dashboard.spaces.length > 0 ? (
+              {dashboard.spaces && dashboard.spaces.length > 0 ? (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">Seleccionar Espacio</label>
                   <select
@@ -1096,14 +1101,16 @@ export default function HomePage() {
         </div>
       )}
 
-      <PlanLimitModal
-        isOpen={dashboard.planLimitModal.isOpen}
-        onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
-        type={dashboard.planLimitModal.type}
-        currentPlan={dashboard.planLimitModal.currentPlan}
-        currentCount={dashboard.planLimitModal.currentCount}
-        limit={dashboard.planLimitModal.limit}
-      />
+      {dashboard.planLimitModal && (
+        <PlanLimitModal
+          isOpen={dashboard.planLimitModal.isOpen}
+          onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
+          type={dashboard.planLimitModal.type}
+          currentPlan={dashboard.planLimitModal.currentPlan}
+          currentCount={dashboard.planLimitModal.currentCount}
+          limit={dashboard.planLimitModal.limit}
+        />
+      )}
     </div>
   );
-}// test 
+}
