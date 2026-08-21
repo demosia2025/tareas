@@ -18,6 +18,7 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 import { CommandPalette } from "@/components/CommandPalette";
 import { InlineTaskRow } from "@/components/InlineTaskRow";
 import { FunctionalCalendarView } from "@/components/FunctionalCalendarView";
+import AIAssistant from "@/components/AIAssistant"; // ✅ IMPORT DEL ASISTENTE IA
 
 import WorkspaceSelector from "@/components/WorkspaceSelector";
 import ConnectedUsersPanel from "@/components/ConnectedUsersPanel";
@@ -355,7 +356,7 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
-    // PANTALLA DE CARGA
+  // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center">
@@ -1097,6 +1098,9 @@ export default function HomePage() {
           limit={dashboard.planLimitModal.limit}
         />
       )}
+
+      {/* ✅ AGREGAR: Asistente IA flotante */}
+      <AIAssistant />
     </div>
   );
 }
