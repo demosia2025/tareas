@@ -24,7 +24,7 @@ import ConnectedUsersPanel from "@/components/ConnectedUsersPanel";
 import PlanLimitModal from "@/components/PlanLimitModal";
 
 export default function HomePage() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const dashboard = useDashboard();
 
@@ -355,14 +355,28 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
-  // PANTALLA DE CARGA
+  // ✅ PANTALLA DE CARGA CON DIAGNÓSTICO EN PANTALLA
   if (status === "loading" || dashboard.loading) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-3 border-cyan-400 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-slate-400 font-light text-xs tracking-wide">Cargando workspace...</p>
-        </div>
+      <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center flex-col gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent mx-auto mb-4"></div>
+        <p className="text-slate-400 font-light text-xs tracking-wide">Cargando workspace...</p>
+        
+        {/* PANEL DE DIAGNÓSTICO DEFINITIVO - SOLO EN DESARROLLO */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 bg-red-950/80 border border-red-500/50 p-4 rounded-lg text-xs text-red-200 font-mono shadow-2xl max-w-md w-full">
+            <p className="font-bold text-red-400 mb-2 border-b border-red-500/30 pb-1">🔍 ESTADO ACTUAL DEL SISTEMA:</p>
+            <p>1. NextAuth Status: <span className="text-white font-bold">{status}</span></p>
+            <p>2. Dashboard Loading: <span className="text-white font-bold">{String(dashboard.loading)}</span></p>
+            <p>3. Sesión Existe: <span className="text-white font-bold">{session ? "SÍ" : "NO"}</span></p>
+            <p>4. User ID: <span className="text-white font-bold">{session?.user?.id || "INDEFINIDO"}</span></p>
+            <p className="mt-2 text-[10px] text-red-300/70">
+              {status === "loading" 
+                ? "CAUSA: NextAuth está atascado en 'loading'. Revisa SessionProvider." 
+                : "CAUSA: El código nuevo de useDashboard NO está en Vercel. Haz git push."}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -686,7 +700,7 @@ export default function HomePage() {
                                     </span>
                                   )}
                                   <span className="text-[10px] text-slate-500">
-                                    📋 {task.listName}
+                                     {task.listName}
                                   </span>
                                 </div>
                               </div>
@@ -1106,6 +1120,14 @@ export default function HomePage() {
           isOpen={dashboard.planLimitModal.isOpen}
           onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
           type={dashboard.planLimitModal.type}
+          currentPlan={dashboard.planLimitModal.currentPlan}
+          currentCount={dashboard.planLimitModal.currentCount}
+          limit={dashboard.planLimitModal.limit}
+        />
+      )}
+    </div>
+  );
+}al.type}
           currentPlan={dashboard.planLimitModal.currentPlan}
           currentCount={dashboard.planLimitModal.currentCount}
           limit={dashboard.planLimitModal.limit}
