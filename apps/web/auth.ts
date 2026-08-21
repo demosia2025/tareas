@@ -4,8 +4,11 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const { handlers, auth } = NextAuth({
+  // ✅ CORREGIDO: Estas propiedades DEBEN estar al nivel raíz, fuera de "providers"
+  trustHost: true, 
+  url: process.env.AUTH_URL || process.env.NEXTAUTH_URL,
+
   providers: [
- trustHost: true,
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -65,7 +68,6 @@ export const { handlers, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // ✅ CORREGIDO: Verificamos que user Y user.id existan antes de usarlos
       if (user && user.id) {
         token.sub = user.id.toString();
         token.role = (user as any).role;
@@ -80,12 +82,9 @@ export const { handlers, auth } = NextAuth({
       return session;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) {
-        return url;
-      }
-      if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
-      }
+      // Permite redirecciones relativas o a la URL base configurada
+      if (url.startsWith(baseUrl)) return url;
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
       return baseUrl;
     }
   },
