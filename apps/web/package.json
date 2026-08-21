@@ -9,15 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.45",
     "@auth/prisma-adapter": "^2.11.3",
     "@hello-pangea/dnd": "^18.0.1",
     "@pm-saas/sync-engine": "workspace:*",
+    "ai": "^7.0.74",
     "bcryptjs": "^3.0.3",
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "next-auth": "5.0.0-beta.31",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",
