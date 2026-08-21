@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 export const { handlers, auth } = NextAuth({
   // ✅ CORREGIDO: Estas propiedades DEBEN estar al nivel raíz, fuera de "providers"
   trustHost: true, 
-  url: process.env.AUTH_URL || process.env.NEXTAUTH_URL,
+  // ❌ ELIMINAR: url: process.env.AUTH_URL || process.env.NEXTAUTH_URL,
 
   providers: [
     Credentials({
@@ -18,7 +18,7 @@ export const { handlers, auth } = NextAuth({
         console.log(" [AUTH] Intentando login con:", credentials?.email);
         
         if (!credentials?.email || !credentials?.password) {
-          console.log("❌ [AUTH] Credenciales faltantes");
+          console.log(" [AUTH] Credenciales faltantes");
           return null;
         }
         
@@ -35,7 +35,7 @@ export const { handlers, auth } = NextAuth({
           console.log("✅ [AUTH] Usuario encontrado:", user.email);
           
           if (!user.password) {
-            console.log("❌ [AUTH] El usuario no tiene contraseña guardada");
+            console.log(" [AUTH] El usuario no tiene contraseña guardada");
             return null;
           }
           
@@ -51,7 +51,7 @@ export const { handlers, auth } = NextAuth({
             return null;
           }
           
-          console.log("🎉 [AUTH] Login exitoso para:", user.email);
+          console.log(" [AUTH] Login exitoso para:", user.email);
           
           return {
             id: user.id.toString(),
