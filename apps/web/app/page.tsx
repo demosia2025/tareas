@@ -362,21 +362,13 @@ export default function HomePage() {
         <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent mx-auto mb-4"></div>
         <p className="text-slate-400 font-light text-xs tracking-wide">Cargando workspace...</p>
         
-        {/* PANEL DE DIAGNÓSTICO DEFINITIVO - SOLO EN DESARROLLO */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-8 bg-red-950/80 border border-red-500/50 p-4 rounded-lg text-xs text-red-200 font-mono shadow-2xl max-w-md w-full">
-            <p className="font-bold text-red-400 mb-2 border-b border-red-500/30 pb-1">🔍 ESTADO ACTUAL DEL SISTEMA:</p>
-            <p>1. NextAuth Status: <span className="text-white font-bold">{status}</span></p>
-            <p>2. Dashboard Loading: <span className="text-white font-bold">{String(dashboard.loading)}</span></p>
-            <p>3. Sesión Existe: <span className="text-white font-bold">{session ? "SÍ" : "NO"}</span></p>
-            <p>4. User ID: <span className="text-white font-bold">{session?.user?.id || "INDEFINIDO"}</span></p>
-            <p className="mt-2 text-[10px] text-red-300/70">
-              {status === "loading" 
-                ? "CAUSA: NextAuth está atascado en 'loading'. Revisa SessionProvider." 
-                : "CAUSA: El código nuevo de useDashboard NO está en Vercel. Haz git push."}
-            </p>
-          </div>
-        )}
+        <div className="mt-8 bg-red-950/80 border border-red-500/50 p-4 rounded-lg text-xs text-red-200 font-mono shadow-2xl max-w-md w-full">
+          <p className="font-bold text-red-400 mb-2 border-b border-red-500/30 pb-1">🔍 ESTADO ACTUAL DEL SISTEMA:</p>
+          <p>1. NextAuth Status: <span className="text-white font-bold">{status}</span></p>
+          <p>2. Dashboard Loading: <span className="text-white font-bold">{String(dashboard.loading)}</span></p>
+          <p>3. Sesión Existe: <span className="text-white font-bold">{session ? "SÍ" : "NO"}</span></p>
+          <p>4. User ID: <span className="text-white font-bold">{session?.user?.id || "INDEFINIDO"}</span></p>
+        </div>
       </div>
     );
   }
@@ -396,7 +388,6 @@ export default function HomePage() {
               <Menu className="w-4 h-4" />
             </button>
             
-            {/* LOGO Y TÍTULO */}
             <div 
               onClick={() => {
                 if (dashboard.selectedList) {
@@ -431,7 +422,6 @@ export default function HomePage() {
               </Link>
             )}
 
-            {/* WORKSPACE SELECTOR */}
             {dashboard.memberships && dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef}>
                 <WorkspaceSelector
@@ -452,9 +442,9 @@ export default function HomePage() {
                       dashboard.setPlanLimitModal({
                         isOpen: true,
                         type: "workspaces",
-                        currentPlan: dashboard.planInfo.planName,
-                        currentCount: dashboard.planInfo.workspaceCount,
-                        limit: dashboard.planInfo.workspaceLimit
+                        currentPlan: dashboard.planInfo?.planName || "Free",
+                        currentCount: dashboard.planInfo?.workspaceCount || 0,
+                        limit: dashboard.planInfo?.workspaceLimit || 0
                       });
                     } else {
                       setIsCreateWorkspaceModalOpen(true);
@@ -474,14 +464,13 @@ export default function HomePage() {
               </Link>
             )}
             
-            {/* MENÚ DE PERFIL */}
             <div className="relative" ref={profileMenuRef}>
               <button onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} className="flex items-center gap-2.5 px-2.5 py-1 rounded-xl hover:bg-slate-800/60 transition-all border border-slate-800/80 hover:border-slate-700/60 shadow-inner">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-cyan-500/20">
-                  {(dashboard.session?.user?.name || "U")[0].toUpperCase()}
+                  {(session?.user?.name || "U")[0].toUpperCase()}
                 </div>
                 <div className="text-left hidden lg:block">
-                  <div className="text-[11px] font-bold text-white leading-tight">{dashboard.session?.user?.name || "Usuario"}</div>
+                  <div className="text-[11px] font-bold text-white leading-tight">{session?.user?.name || "Usuario"}</div>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -491,8 +480,8 @@ export default function HomePage() {
                   <div className="fixed inset-0 z-40" onClick={() => dashboard.setIsProfileMenuOpen(false)}></div>
                   <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 z-[9999] backdrop-blur-2xl animate-in fade-in zoom-in-95">
                     <div className="px-3.5 py-2 border-b border-slate-800">
-                      <p className="text-xs font-bold text-white truncate">{dashboard.session?.user?.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{dashboard.session?.user?.email}</p>
+                      <p className="text-xs font-bold text-white truncate">{session?.user?.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{session?.user?.email}</p>
                     </div>
                     <button onClick={() => { dashboard.setIsProfileMenuOpen(false); router.push('/profile'); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors">
                       <User className="w-4 h-4 text-slate-400" /><span>Mi Perfil</span>
@@ -641,7 +630,6 @@ export default function HomePage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-0 md:gap-8 items-start">
-                  {/* SECCIÓN IZQUIERDA: TAREAS RECIENTES */}
                   <div className={`space-y-5 ${hasWorkspace ? 'md:border-r md:border-slate-800/60 md:pr-8' : ''}`}>
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
@@ -700,7 +688,7 @@ export default function HomePage() {
                                     </span>
                                   )}
                                   <span className="text-[10px] text-slate-500">
-                                     {task.listName}
+                                    {task.listName}
                                   </span>
                                 </div>
                               </div>
@@ -720,7 +708,6 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* SECCIÓN DERECHA: CREAR NUEVO TRABAJO */}
                   <div className="space-y-5 md:pl-8">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center">
@@ -822,7 +809,6 @@ export default function HomePage() {
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
-      {/* MODAL: CREAR WORKSPACE */}
       {isCreateWorkspaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -865,7 +851,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: CREAR ESPACIO */}
       {isCreateSpaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -908,7 +893,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: CREAR TAREA */}
       {isCreateTaskModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -959,7 +943,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: CREAR CARPETA */}
       {isCreateFolderModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1021,7 +1004,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: UNIRME A WORKSPACE */}
       {dashboard.isJoinModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1086,7 +1068,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MODAL: LOGOUT */}
       {dashboard.isLogoutModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1115,19 +1096,11 @@ export default function HomePage() {
         </div>
       )}
 
-      {dashboard.planLimitModal && (
+      {dashboard.planLimitModal.isOpen && (
         <PlanLimitModal
           isOpen={dashboard.planLimitModal.isOpen}
           onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
           type={dashboard.planLimitModal.type}
-          currentPlan={dashboard.planLimitModal.currentPlan}
-          currentCount={dashboard.planLimitModal.currentCount}
-          limit={dashboard.planLimitModal.limit}
-        />
-      )}
-    </div>
-  );
-}al.type}
           currentPlan={dashboard.planLimitModal.currentPlan}
           currentCount={dashboard.planLimitModal.currentCount}
           limit={dashboard.planLimitModal.limit}
