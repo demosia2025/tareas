@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react"; // ✅ Importación corregida
+import { useChat } from "ai"; // ✅ Importación correcta para v7
 import { useSession } from "next-auth/react";
 import { MessageSquare, X, Send, Bot, User, Loader2 } from "lucide-react";
 
