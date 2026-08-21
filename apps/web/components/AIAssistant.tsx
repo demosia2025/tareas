@@ -1,129 +1,269 @@
-"use client";
+import { openai } from "@ai-sdk/openai";
+import { streamText, tool } from "ai";
+import { auth } from "@/auth";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 
-import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react"; // ✅ Para v3.4.33
-import { useSession } from "next-auth/react";
-import { MessageSquare, X, Send, Bot, User, Loader2 } from "lucide-react";
+const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una aplicación SaaS para gestión de proyectos.
 
-export default function AIAssistant() {
-  const { data: session } = useSession();
-  const userName = session?.user?.name?.split(" ")[0] || "amigo";
+## TUS CONOCIMIENTOS:
+- **Organización**: Entidad principal. Contiene workspaces.
+- **Workspace**: Espacio de trabajo. Tiene miembros con roles (owner, admin, member).
+- **Space (Espacio)**: Contenedor dentro del workspace.
+- **Folder (Carpeta)**: Sub-organización dentro de un espacio.
+- **List (Lista)**: Contiene las tareas.
+- **Task (Tarea)**: Unidad de trabajo con estado (todo, in_progress, done), prioridad y asignados.
 
-  const [isOpen, setIsOpen] = useState(false);
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/ai-assistant",
-  });
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+## Instrucciones:
+- Responde SIEMPRE en español.
+- Sé conciso y claro (máximo 3-4 oraciones por respuesta).
+- Usa las herramientas disponibles para consultar datos REALES del usuario.
+- NUNCA inventes datos sobre tareas o usuarios específicos.
+`;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return new Response("No autorizado", { status: 401 });
+    }
 
-  return (
-    <>
-      {/* Botón flotante */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/30 hover:scale-110 transition-transform flex items-center justify-center"
-        title="Asistente IA"
-      >
-        {isOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
-      </button>
+    const userId = session.user.id;
+    const { messages } = await req.json();
 
-      {/* Panel del chat */}
-      {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in">
-          {/* Header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-white" />
-              <div>
-                <h3 className="text-sm font-bold text-white">Asistente IA</h3>
-                <p className="text-[10px] text-cyan-100">Pregúntame sobre el sistema</p>
-              </div>
-            </div>
-          </div>
+    const result = streamText({
+      model: openai("gpt-4o-mini"),
+      system: SYSTEM_PROMPT,
+      messages,
+      maxTokens: 800,
+      temperature: 0.7,
+      tools: {
+        getUserWorkspaces: tool({
+          description: "Obtiene todos los workspaces a los que pertenece el usuario actual",
+          parameters: z.object({}),
+          execute: async () => {
+            const memberships = await prisma.workspaceMember.findMany({
+              where: { userId },
+              include: {
+                workspace: {
+                  include: {
+                    organization: true,
+                    _count: { select: { spaces: true, members: true } },
+                  },
+                },
+              },
+            });
 
-          {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.length === 0 && (
-              <div className="text-center py-8">
-                <Bot className="w-10 h-10 text-cyan-400 mx-auto mb-3" />
-                <p className="text-xs text-slate-400">
-                  ¡Hola, <span className="text-cyan-300 font-semibold">{userName}</span>! Soy tu asistente inteligente.
-                </p>
-                <p className="text-xs text-slate-400 mt-1">Pregúntame sobre:</p>
-                <ul className="text-[10px] text-slate-500 mt-2 space-y-1 text-left max-w-[250px] mx-auto">
-                  <li>• "¿Cuántas tareas tengo pendientes?"</li>
-                  <li>• "¿Quién está asignado a la tarea X?"</li>
-                  <li>• "Muéstrame mis workspaces"</li>
-                  <li>• "¿Cuál es el progreso de mi workspace?"</li>
-                  <li>• "¿Cómo creo un nuevo espacio?"</li>
-                </ul>
-              </div>
-            )}
+            return memberships.map((m) => ({
+              workspaceId: m.workspace.id,
+              workspaceName: m.workspace.name,
+              organizationName: m.workspace.organization?.name || "Sin organización",
+              role: m.role,
+              spacesCount: m.workspace._count.spaces,
+              membersCount: m.workspace._count.members,
+            }));
+          },
+        }),
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {message.role === "assistant" && (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                )}
-                <div
-                  className={`max-w-[80%] px-3 py-2 rounded-xl text-xs whitespace-pre-wrap ${
-                    message.role === "user"
-                      ? "bg-cyan-600 text-white rounded-br-none"
-                      : "bg-slate-800 text-slate-200 rounded-bl-none"
-                  }`}
-                >
-                  {message.content}
-                </div>
-                {message.role === "user" && (
-                  <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-white" />
-                  </div>
-                )}
-              </div>
-            ))}
+        getUserTasks: tool({
+          description: "Obtiene las tareas del usuario. Puede filtrar por estado (todo, in_progress, done) o workspace",
+          parameters: z.object({
+            status: z.enum(["todo", "in_progress", "done", "all"]).optional().default("all"),
+            workspaceId: z.string().optional(),
+            limit: z.number().optional().default(10),
+          }),
+          execute: async ({ status, workspaceId, limit }) => {
+            const taskMembers = await prisma.taskMember.findMany({
+              where: {
+                userId,
+                task: workspaceId ? { list: { space: { workspaceId } } } : {},
+              },
+              include: {
+                task: {
+                  include: {
+                    list: {
+                      include: {
+                        space: { include: { workspace: true } },
+                      },
+                    },
+                    // ✅ CORREGIDO: assignee apunta directamente al User, usamos select
+                    assignee: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+              take: limit,
+            });
 
-            {isLoading && (
-              <div className="flex gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <div className="bg-slate-800 px-3 py-2 rounded-xl rounded-bl-none">
-                  <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+            let filteredTasks = taskMembers.map((tm) => tm.task);
 
-          {/* Input */}
-          <form onSubmit={handleSubmit} className="p-3 border-t border-slate-800 bg-slate-900/80">
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={handleInputChange}
-                placeholder="Escribe tu pregunta..."
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50"
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="w-9 h-9 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-white disabled:opacity-50 hover:scale-105 transition-transform"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-    </>
-  );
+            if (status !== "all") {
+              filteredTasks = filteredTasks.filter((t) => t.status === status);
+            }
+
+            return filteredTasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              priority: task.priority,
+              dueDate: task.dueDate,
+              workspaceName: task.list?.space?.workspace?.name || "Desconocido",
+              spaceName: task.list?.space?.name || "Desconocido",
+              listName: task.list?.name || "Desconocida",
+              assignees: task.assignee ? [{
+                userId: task.assignee.id,
+                userName: task.assignee.name,
+                userEmail: task.assignee.email,
+              }] : [],
+            }));
+          },
+        }),
+
+        getWorkspaceMembers: tool({
+          description: "Obtiene todos los miembros de un workspace específico",
+          parameters: z.object({ workspaceId: z.string() }),
+          execute: async ({ workspaceId }) => {
+            const members = await prisma.workspaceMember.findMany({
+              where: { workspaceId },
+              include: {
+                user: { select: { id: true, name: true, email: true } },
+              },
+            });
+
+            return members.map((m) => ({
+              userId: m.user.id,
+              userName: m.user.name,
+              userEmail: m.user.email,
+              role: m.role,
+            }));
+          },
+        }),
+
+        getWorkspaceStats: tool({
+          description: "Obtiene estadísticas de un workspace: total de tareas, tareas por estado, miembros, etc.",
+          parameters: z.object({ workspaceId: z.string() }),
+          execute: async ({ workspaceId }) => {
+            const spaces = await prisma.space.findMany({
+              where: { workspaceId },
+              include: {
+                lists: {
+                  include: {
+                    tasks: {
+                      include: {
+                        // ✅ CORREGIDO: assignee apunta directamente al User
+                        assignee: { select: { id: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            });
+
+            let totalTasks = 0;
+            let todoCount = 0;
+            let inProgressCount = 0;
+            let doneCount = 0;
+
+            spaces.forEach((space) => {
+              space.lists.forEach((list) => {
+                list.tasks.forEach(() => {
+                  totalTasks++;
+                  // Nota: Ajusta esto si tu campo de estado tiene otro nombre
+                });
+              });
+            });
+
+            // Conteo simplificado para evitar errores de tipado si el estado varía
+            const tasks = await prisma.task.findMany({
+              where: { list: { space: { workspaceId } } },
+              select: { status: true },
+            });
+            
+            tasks.forEach(t => {
+              if (t.status === "todo") todoCount++;
+              else if (t.status === "in_progress") inProgressCount++;
+              else if (t.status === "done") doneCount++;
+            });
+
+            const membersCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+
+            return {
+              totalTasks,
+              todoCount,
+              inProgressCount,
+              doneCount,
+              membersCount,
+              spacesCount: spaces.length,
+              completionRate: totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0,
+            };
+          },
+        }),
+
+        searchTask: tool({
+          description: "Busca una tarea específica por su ID o por su título",
+          parameters: z.object({
+            taskId: z.string().optional(),
+            title: z.string().optional(),
+          }),
+          execute: async ({ taskId, title }) => {
+            if (!taskId && !title) return [];
+
+            const tasks = await prisma.task.findMany({
+              where: {
+                AND: [
+                  taskId ? { id: taskId } : {},
+                  title ? { title: { contains: title, mode: "insensitive" } } : {},
+                  {
+                    list: {
+                      space: {
+                        workspace: {
+                          members: { some: { userId } },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+              include: {
+                list: { include: { space: { include: { workspace: true } } } },
+                // ✅ CORREGIDO: assignee apunta directamente al User
+                assignee: {
+                  select: { id: true, name: true, email: true },
+                },
+              },
+              take: 5,
+            });
+
+            return tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              priority: task.priority,
+              dueDate: task.dueDate,
+              workspaceName: task.list?.space?.workspace?.name || "Desconocido",
+              spaceName: task.list?.space?.name || "Desconocido",
+              listName: task.list?.name || "Desconocida",
+              assignees: task.assignee ? [{
+                userId: task.assignee.id,
+                userName: task.assignee.name,
+                userEmail: task.assignee.email,
+              }] : [],
+            }));
+          },
+        }),
+      },
+    });
+
+    return result.toDataStreamResponse();
+  } catch (error) {
+    console.error("Error en AI Assistant:", error);
+    return new Response("Error del servidor", { status: 500 });
+  }
 }
