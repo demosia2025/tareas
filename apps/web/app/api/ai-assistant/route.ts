@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     const userId = session.user.id;
     const { messages } = await req.json();
 
-    const result = streamText({
+    // ✅ CORREGIDO DEFINITIVO: 'await' resuelve la confusión de tipos de TypeScript con streamText
+    const result = await streamText({
       model: openai("gpt-4o-mini"),
       system: SYSTEM_PROMPT,
       messages,
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
         }),
 
         getUserTasks: tool({
-          description: "Obtiene las tareas del usuario. Puede filtrar por estado (todo, in_progress, done) o workspace",
+          description: "Obtiene las tareas del usuario. Puede filtrar por estado o workspace",
           parameters: z.object({
             status: z.enum(["todo", "in_progress", "done", "all"]).optional().default("all"),
             workspaceId: z.string().optional(),
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
                         space: { include: { workspace: true } },
                       },
                     },
-                    // ✅ CORREGIDO: assignee apunta directamente al User, usamos select
+                    // ✅ CORREGIDO: assignee apunta directamente al User
                     assignee: {
                       select: {
                         id: true,
@@ -207,7 +208,6 @@ export async function POST(req: Request) {
               },
               include: {
                 list: { include: { space: { include: { workspace: true } } } },
-                // ✅ CORREGIDO: assignee apunta directamente al User
                 assignee: {
                   select: { id: true, name: true, email: true },
                 },
