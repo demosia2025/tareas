@@ -4,34 +4,21 @@ import { auth } from "@/auth";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
-// System prompt mejorado
 const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una aplicación SaaS para gestión de proyectos.
 
 ## TUS CONOCIMIENTOS:
-
-### Estructura del sistema:
-- **Organización**: Es la entidad principal. Contiene workspaces.
-- **Workspace**: Espacio de trabajo dentro de una organización. Tiene miembros con roles (owner, admin, member).
-- **Space (Espacio)**: Contenedor dentro del workspace para organizar proyectos.
+- **Organización**: Entidad principal. Contiene workspaces.
+- **Workspace**: Espacio de trabajo. Tiene miembros con roles (owner, admin, member).
+- **Space (Espacio)**: Contenedor dentro del workspace.
 - **Folder (Carpeta)**: Sub-organización dentro de un espacio.
 - **List (Lista)**: Contiene las tareas.
-- **Task (Tarea)**: Unidad de trabajo con estado (todo, in_progress, done), prioridad (low, medium, high, urgent), subtareas y miembros asignados.
+- **Task (Tarea)**: Unidad de trabajo con estado (todo, in_progress, done), prioridad y asignados.
 
-### Funcionalidades principales:
-- Crear/editar/eliminar workspaces, espacios, carpetas, listas y tareas
-- Vista de lista, tablero Kanban y calendario
-- Filtros por estado y prioridad
-- Búsqueda con K
-- Invitar usuarios con códigos de invitación
-- Planes con límites (Free, Pro, Enterprise)
-
-### Instrucciones:
-- Responde SIEMPRE en español
-- Sé conciso y claro (máximo 3-4 oraciones por respuesta)
-- Si no sabes algo, di "No tengo información sobre eso, pero puedes consultar la documentación o contactar al administrador"
-- Usa formato markdown cuando sea útil (listas, negritas)
-- **IMPORTANTE**: Usa las herramientas disponibles para consultar datos REALES del usuario (sus tareas, workspaces, miembros, etc.)
-- NUNCA inventes datos sobre tareas o usuarios específicos
+## Instrucciones:
+- Responde SIEMPRE en español.
+- Sé conciso y claro (máximo 3-4 oraciones por respuesta).
+- Usa las herramientas disponibles para consultar datos REALES del usuario.
+- NUNCA inventes datos sobre tareas o usuarios específicos.
 `;
 
 export async function POST(req: Request) {
@@ -51,7 +38,6 @@ export async function POST(req: Request) {
       maxTokens: 800,
       temperature: 0.7,
       tools: {
-        // 🔍 HERRAMIENTA 1: Obtener workspaces del usuario
         getUserWorkspaces: tool({
           description: "Obtiene todos los workspaces a los que pertenece el usuario actual",
           parameters: z.object({}),
@@ -62,12 +48,7 @@ export async function POST(req: Request) {
                 workspace: {
                   include: {
                     organization: true,
-                    _count: {
-                      select: {
-                        spaces: true,
-                        members: true,
-                      },
-                    },
+                    _count: { select: { spaces: true, members: true } },
                   },
                 },
               },
@@ -84,7 +65,6 @@ export async function POST(req: Request) {
           },
         }),
 
-        // 📋 HERRAMIENTA 2: Obtener tareas del usuario
         getUserTasks: tool({
           description: "Obtiene las tareas del usuario. Puede filtrar por estado (todo, in_progress, done) o workspace",
           parameters: z.object({
@@ -96,35 +76,22 @@ export async function POST(req: Request) {
             const taskMembers = await prisma.taskMember.findMany({
               where: {
                 userId,
-                task: workspaceId ? {
-                  list: {
-                    space: {
-                      workspaceId,
-                    },
-                  },
-                } : {},
+                task: workspaceId ? { list: { space: { workspaceId } } } : {},
               },
               include: {
                 task: {
                   include: {
                     list: {
                       include: {
-                        space: {
-                          include: {
-                            workspace: true,
-                          },
-                        },
+                        space: { include: { workspace: true } },
                       },
                     },
-                    assignee: { // ✅ CORREGIDO: assignee (singular) en lugar de assignees
-                      include: {
-                        user: {
-                          select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                          },
-                        },
+                    // ✅ CORREGIDO: assignee apunta directamente al User, usamos select
+                    assignee: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
                       },
                     },
                   },
@@ -149,32 +116,23 @@ export async function POST(req: Request) {
               workspaceName: task.list?.space?.workspace?.name || "Desconocido",
               spaceName: task.list?.space?.name || "Desconocido",
               listName: task.list?.name || "Desconocida",
-              assignees: task.assignee?.map((a) => ({ // ✅ CORREGIDO aquí también
-                userId: a.user.id,
-                userName: a.user.name,
-                userEmail: a.user.email,
-              })) || [],
+              assignees: task.assignee ? [{
+                userId: task.assignee.id,
+                userName: task.assignee.name,
+                userEmail: task.assignee.email,
+              }] : [],
             }));
           },
         }),
 
-        // 👥 HERRAMIENTA 3: Obtener miembros de un workspace
         getWorkspaceMembers: tool({
           description: "Obtiene todos los miembros de un workspace específico",
-          parameters: z.object({
-            workspaceId: z.string(),
-          }),
+          parameters: z.object({ workspaceId: z.string() }),
           execute: async ({ workspaceId }) => {
             const members = await prisma.workspaceMember.findMany({
               where: { workspaceId },
               include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  },
-                },
+                user: { select: { id: true, name: true, email: true } },
               },
             });
 
@@ -187,62 +145,41 @@ export async function POST(req: Request) {
           },
         }),
 
-        // 📊 HERRAMIENTA 4: Obtener estadísticas del workspace
         getWorkspaceStats: tool({
           description: "Obtiene estadísticas de un workspace: total de tareas, tareas por estado, miembros, etc.",
-          parameters: z.object({
-            workspaceId: z.string(),
-          }),
+          parameters: z.object({ workspaceId: z.string() }),
           execute: async ({ workspaceId }) => {
-            // Obtener todas las listas del workspace
-            const spaces = await prisma.space.findMany({
-              where: { workspaceId },
-              include: {
-                lists: {
-                  include: {
-                    tasks: {
-                      include: {
-                        assignee: true, // ✅ CORREGIDO
-                      },
-                    },
-                  },
-                },
-              },
+            const tasks = await prisma.task.findMany({
+              where: { list: { space: { workspaceId } } },
+              select: { status: true },
             });
-
-            let totalTasks = 0;
+            
+            let totalTasks = tasks.length;
             let todoCount = 0;
             let inProgressCount = 0;
             let doneCount = 0;
 
-            spaces.forEach((space) => {
-              space.lists.forEach((list) => {
-                list.tasks.forEach((task) => {
-                  totalTasks++;
-                  if (task.status === "todo") todoCount++;
-                  else if (task.status === "in_progress") inProgressCount++;
-                  else if (task.status === "done") doneCount++;
-                });
-              });
+            tasks.forEach(t => {
+              if (t.status === "todo") todoCount++;
+              else if (t.status === "in_progress") inProgressCount++;
+              else if (t.status === "done") doneCount++;
             });
 
-            const members = await prisma.workspaceMember.count({
-              where: { workspaceId },
-            });
+            const membersCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+            const spacesCount = await prisma.space.count({ where: { workspaceId } });
 
             return {
               totalTasks,
               todoCount,
               inProgressCount,
               doneCount,
-              membersCount: members,
-              spacesCount: spaces.length,
+              membersCount,
+              spacesCount,
               completionRate: totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0,
             };
           },
         }),
 
-        // 🔍 HERRAMIENTA 5: Buscar tarea por ID o título
         searchTask: tool({
           description: "Busca una tarea específica por su ID o por su título",
           parameters: z.object({
@@ -250,29 +187,18 @@ export async function POST(req: Request) {
             title: z.string().optional(),
           }),
           execute: async ({ taskId, title }) => {
-            if (!taskId && !title) {
-              return [];
-            }
+            if (!taskId && !title) return [];
 
             const tasks = await prisma.task.findMany({
               where: {
                 AND: [
                   taskId ? { id: taskId } : {},
-                  title ? { 
-                    title: {
-                      contains: title,
-                      mode: "insensitive",
-                    },
-                  } : {},
+                  title ? { title: { contains: title, mode: "insensitive" } } : {},
                   {
                     list: {
                       space: {
                         workspace: {
-                          members: {
-                            some: {
-                              userId,
-                            },
-                          },
+                          members: { some: { userId } },
                         },
                       },
                     },
@@ -280,25 +206,10 @@ export async function POST(req: Request) {
                 ],
               },
               include: {
-                list: {
-                  include: {
-                    space: {
-                      include: {
-                        workspace: true,
-                      },
-                    },
-                  },
-                },
-                assignee: { // ✅ CORREGIDO
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                      },
-                    },
-                  },
+                list: { include: { space: { include: { workspace: true } } } },
+                // ✅ CORREGIDO: assignee apunta directamente al User
+                assignee: {
+                  select: { id: true, name: true, email: true },
                 },
               },
               take: 5,
@@ -314,11 +225,11 @@ export async function POST(req: Request) {
               workspaceName: task.list?.space?.workspace?.name || "Desconocido",
               spaceName: task.list?.space?.name || "Desconocido",
               listName: task.list?.name || "Desconocida",
-              assignees: task.assignee?.map((a) => ({ // ✅ CORREGIDO
-                userId: a.user.id,
-                userName: a.user.name,
-                userEmail: a.user.email,
-              })) || [],
+              assignees: task.assignee ? [{
+                userId: task.assignee.id,
+                userName: task.assignee.name,
+                userEmail: task.assignee.email,
+              }] : [],
             }));
           },
         }),
