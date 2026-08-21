@@ -116,7 +116,7 @@ export async function POST(req: Request) {
                         },
                       },
                     },
-                    assignees: {
+                    assignee: { // ✅ CORREGIDO: assignee (singular) en lugar de assignees
                       include: {
                         user: {
                           select: {
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
               workspaceName: task.list?.space?.workspace?.name || "Desconocido",
               spaceName: task.list?.space?.name || "Desconocido",
               listName: task.list?.name || "Desconocida",
-              assignees: task.assignees?.map((a) => ({
+              assignees: task.assignee?.map((a) => ({ // ✅ CORREGIDO aquí también
                 userId: a.user.id,
                 userName: a.user.name,
                 userEmail: a.user.email,
@@ -202,7 +202,7 @@ export async function POST(req: Request) {
                   include: {
                     tasks: {
                       include: {
-                        assignees: true,
+                        assignee: true, // ✅ CORREGIDO
                       },
                     },
                   },
@@ -289,7 +289,7 @@ export async function POST(req: Request) {
                     },
                   },
                 },
-                assignees: {
+                assignee: { // ✅ CORREGIDO
                   include: {
                     user: {
                       select: {
@@ -314,7 +314,7 @@ export async function POST(req: Request) {
               workspaceName: task.list?.space?.workspace?.name || "Desconocido",
               spaceName: task.list?.space?.name || "Desconocido",
               listName: task.list?.name || "Desconocida",
-              assignees: task.assignees?.map((a) => ({
+              assignees: task.assignee?.map((a) => ({ // ✅ CORREGIDO
                 userId: a.user.id,
                 userName: a.user.name,
                 userEmail: a.user.email,
