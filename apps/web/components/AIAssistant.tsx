@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
-import { useSession } from "next-auth/react"; // ✅ 1. Importar useSession
+import { useChat } from "ai/react"; // ✅ Importación corregida
+import { useSession } from "next-auth/react";
 import { MessageSquare, X, Send, Bot, User, Loader2 } from "lucide-react";
 
 export default function AIAssistant() {
-  const { data: session } = useSession(); // ✅ 2. Obtener la sesión del usuario
-  
-  // ✅ 3. Extraer el primer nombre (ej: "Rafael" de "Rafael Pérez") o usar "amigo" por defecto
+  const { data: session } = useSession();
   const userName = session?.user?.name?.split(" ")[0] || "amigo";
 
   const [isOpen, setIsOpen] = useState(false);
@@ -51,12 +49,9 @@ export default function AIAssistant() {
             {messages.length === 0 && (
               <div className="text-center py-8">
                 <Bot className="w-10 h-10 text-cyan-400 mx-auto mb-3" />
-                
-                {/* ✅ 4. Saludo personalizado con el nombre */}
                 <p className="text-xs text-slate-400">
                   ¡Hola, <span className="text-cyan-300 font-semibold">{userName}</span>! Soy tu asistente inteligente.
                 </p>
-                
                 <p className="text-xs text-slate-400 mt-1">Pregúntame sobre:</p>
                 <ul className="text-[10px] text-slate-500 mt-2 space-y-1 text-left max-w-[250px] mx-auto">
                   <li>• "¿Cuántas tareas tengo pendientes?"</li>
