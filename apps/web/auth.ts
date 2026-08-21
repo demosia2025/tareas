@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 
 export const { handlers, auth } = NextAuth({
   providers: [
+ trustHost: true,
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
