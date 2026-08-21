@@ -355,20 +355,11 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
-  // ✅ PANTALLA DE CARGA CON DIAGNÓSTICO EN PANTALLA
+    // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center flex-col gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent mx-auto mb-4"></div>
-        <p className="text-slate-400 font-light text-xs tracking-wide">Cargando workspace...</p>
-        
-        <div className="mt-8 bg-red-950/80 border border-red-500/50 p-4 rounded-lg text-xs text-red-200 font-mono shadow-2xl max-w-md w-full">
-          <p className="font-bold text-red-400 mb-2 border-b border-red-500/30 pb-1">🔍 ESTADO ACTUAL DEL SISTEMA:</p>
-          <p>1. NextAuth Status: <span className="text-white font-bold">{status}</span></p>
-          <p>2. Dashboard Loading: <span className="text-white font-bold">{String(dashboard.loading)}</span></p>
-          <p>3. Sesión Existe: <span className="text-white font-bold">{session ? "SÍ" : "NO"}</span></p>
-          <p>4. User ID: <span className="text-white font-bold">{session?.user?.id || "INDEFINIDO"}</span></p>
-        </div>
+      <div className="h-screen w-screen overflow-hidden bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent"></div>
       </div>
     );
   }
