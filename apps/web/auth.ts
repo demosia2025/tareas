@@ -1,9 +1,9 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const authConfig: NextAuthConfig = {
   trustHost: true,
   providers: [
     Credentials({
@@ -71,4 +71,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login",
   },
   debug: process.env.NODE_ENV === "development",
-});
+};
+
+const nextAuth = NextAuth(authConfig);
+
+// Forzamos el casteo en la destructuración para evitar la fuga de tipos internos en Next.js
+export const { handlers, auth, signIn, signOut }: any = nextAuth;
