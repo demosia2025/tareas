@@ -1,13 +1,12 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-export const { handlers, auth } = NextAuth({
-  // ✅ CORREGIDO: Estas propiedades DEBEN estar al nivel raíz, fuera de "providers"
-  trustHost: true, 
-  // ❌ ELIMINAR: url: process.env.AUTH_URL || process.env.NEXTAUTH_URL,
-
+// ✅ SOLUCIÓN: Definir la configuración con tipo explícito para evitar errores de inferencia de TS
+const authConfig: NextAuthConfig = {
+  trustHost: true,
+  
   providers: [
     Credentials({
       credentials: {
@@ -18,7 +17,7 @@ export const { handlers, auth } = NextAuth({
         console.log(" [AUTH] Intentando login con:", credentials?.email);
         
         if (!credentials?.email || !credentials?.password) {
-          console.log(" [AUTH] Credenciales faltantes");
+          console.log("❌ [AUTH] Credenciales faltantes");
           return null;
         }
         
@@ -35,7 +34,7 @@ export const { handlers, auth } = NextAuth({
           console.log("✅ [AUTH] Usuario encontrado:", user.email);
           
           if (!user.password) {
-            console.log(" [AUTH] El usuario no tiene contraseña guardada");
+            console.log("❌ [AUTH] El usuario no tiene contraseña guardada");
             return null;
           }
           
@@ -51,7 +50,7 @@ export const { handlers, auth } = NextAuth({
             return null;
           }
           
-          console.log(" [AUTH] Login exitoso para:", user.email);
+          console.log("🎉 [AUTH] Login exitoso para:", user.email);
           
           return {
             id: user.id.toString(),
@@ -66,6 +65,7 @@ export const { handlers, auth } = NextAuth({
       }
     })
   ],
+  
   callbacks: {
     async jwt({ token, user }) {
       if (user && user.id) {
@@ -82,18 +82,23 @@ export const { handlers, auth } = NextAuth({
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Permite redirecciones relativas o a la URL base configurada
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       return baseUrl;
     }
   },
+  
   session: {
     strategy: "jwt",
   },
+  
   pages: {
     signIn: "/login",
     error: "/login",
   },
+  
   debug: process.env.NODE_ENV === "development",
-});
+};
+
+// ✅ Exportamos usando la variable tipada
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
