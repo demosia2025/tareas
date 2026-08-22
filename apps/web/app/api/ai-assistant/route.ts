@@ -10,11 +10,13 @@ const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas". Respon
 
 export async function POST(req: Request) {
   try {
+    console.log("🔍 [AI API] Iniciando petición...");
+    
     // 1. Verificar autenticación
     const session = await auth();
     
     if (!session?.user?.id) {
-      console.warn("⚠️ AI Assistant: Usuario no autenticado o sin ID", session);
+      console.warn("⚠️ [AI API] Usuario no autenticado o sin ID. Session:", session);
       return new Response(JSON.stringify({ error: "No autorizado" }), { 
         status: 401,
         headers: { "Content-Type": "application/json" }
@@ -24,9 +26,10 @@ export async function POST(req: Request) {
     const userId = session.user.id;
     const { messages } = await req.json();
 
-    console.log("✅ AI Assistant: Iniciando stream para usuario:", userId);
+    console.log("✅ [AI API] Usuario autenticado. Iniciando stream para usuario:", userId);
 
-    // 2. Se agrega `await` porque las herramientas asíncronas retornan una Promesa
+    // 2. ✅ CORRECCIÓN: Usamos 'await' porque tu entorno de TypeScript está infiriendo 
+    // que streamText devuelve una Promise. Esto satisface al compilador y funciona en runtime.
     const result = await streamText({
       model: openai("gpt-4o-mini"),
       system: SYSTEM_PROMPT,
@@ -99,7 +102,7 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log("🚀 AI Assistant: Devolviendo stream a respuesta");
+    console.log("🚀 [AI API] Devolviendo stream a respuesta");
     return result.toDataStreamResponse();
     
   } catch (error) {
