@@ -73,6 +73,5 @@ const authConfig: NextAuthConfig = {
   debug: process.env.NODE_ENV === "development",
 };
 
-// ✅ SOLUCIÓN DEFINITIVA: Ignorar el bug de inferencia de tipos de NextAuth v5
-// @ts-expect-error NextAuth v5 tiene un bug conocido de inferencia de tipos en TS
+// @ts-ignore
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
