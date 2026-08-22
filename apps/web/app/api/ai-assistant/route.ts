@@ -1,114 +1,115 @@
-import { openai } from "@ai-sdk/openai";
-import { streamText, tool } from "ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/auth";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas". Responde SIEMPRE en español. Sé conciso y útil.`;
+const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una aplicación SaaS para gestión de proyectos.
+
+## TUS CONOCIMIENTOS:
+- **Organización**: Entidad principal. Contiene workspaces.
+- **Workspace**: Espacio de trabajo. Tiene miembros con roles (owner, admin, member).
+- **Space (Espacio)**: Contenedor dentro del workspace.
+- **Folder (Carpeta)**: Sub-organización dentro de un espacio.
+- **List (Lista)**: Contiene las tareas.
+- **Task (Tarea)**: Unidad de trabajo con estado (todo, in_progress, done), prioridad y asignados.
+
+## Instrucciones:
+- Responde SIEMPRE en español.
+- Sé conciso y claro (máximo 3-4 oraciones por respuesta).
+- Usa las herramientas disponibles para consultar datos REALES del usuario.
+- NUNCA inventes datos sobre tareas o usuarios específicos.
+`;
+
+// ✅ Función para convertir mensajes al formato de Gemini
+function convertMessages(messages: any[]) {
+  return messages.map((msg) => ({
+    role: msg.role === "user" ? "user" : "model",
+    parts: [{ text: msg.content }],
+  }));
+}
 
 export async function POST(req: Request) {
   try {
-    console.log("🔍 [AI API] Iniciando petición...");
-    
-    // 1. Verificar autenticación
+    console.log(" [AI API] Iniciando petición con Google Gemini...");
+
     const session = await auth();
-    
+
     if (!session?.user?.id) {
-      console.warn("⚠️ [AI API] Usuario no autenticado o sin ID. Session:", session);
-      return new Response(JSON.stringify({ error: "No autorizado" }), { 
+      console.warn("⚠️ [AI API] Usuario no autenticado");
+      return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const userId = session.user.id;
     const { messages } = await req.json();
 
-    console.log("✅ [AI API] Usuario autenticado. Iniciando stream para usuario:", userId);
+    console.log("✅ [AI API] Usuario autenticado:", userId);
 
-    // 2. ✅ CORRECCIÓN: Usamos 'await' porque tu entorno de TypeScript está infiriendo 
-    // que streamText devuelve una Promise. Esto satisface al compilador y funciona en runtime.
-    const result = await streamText({
-      model: openai("gpt-4o-mini"),
-      system: SYSTEM_PROMPT,
-      messages,
-      maxTokens: 800,
-      temperature: 0.7,
-      tools: {
-        getUserWorkspaces: tool({
-          description: "Obtiene los workspaces del usuario",
-          parameters: z.object({}),
-          execute: async () => {
-            console.log("🔧 Ejecutando herramienta: getUserWorkspaces");
-            const memberships = await prisma.workspaceMember.findMany({
-              where: { userId },
-              include: {
-                workspace: {
-                  include: {
-                    organization: true,
-                    _count: { select: { spaces: true, members: true } },
-                  },
-                },
-              },
-            });
-            return memberships.map((m) => ({
-              workspaceId: m.workspace.id,
-              workspaceName: m.workspace.name,
-              organizationName: m.workspace.organization?.name || "Sin organización",
-              role: m.role,
-            }));
-          },
-        }),
-        getUserTasks: tool({
-          description: "Obtiene las tareas del usuario",
-          parameters: z.object({
-            status: z.enum(["todo", "in_progress", "done", "all"]).optional().default("all"),
-          }),
-          execute: async ({ status }) => {
-            console.log("🔧 Ejecutando herramienta: getUserTasks con status:", status);
-            const taskMembers = await prisma.taskMember.findMany({
-              where: { 
-                userId, 
-                task: { status: status === "all" ? undefined : status } 
-              },
-              include: {
-                task: {
-                  include: {
-                    list: {
-                      include: {
-                        space: { include: { workspace: true } },
-                      },
-                    },
-                    assignee: { select: { id: true, name: true, email: true } },
-                  },
-                },
-              },
-              take: 10,
-            });
-            return taskMembers.map((tm) => ({
-              id: tm.task.id,
-              title: tm.task.title,
-              status: tm.task.status,
-              workspaceName: tm.task.list?.space?.workspace?.name || "Desconocido",
-              assignees: tm.task.assignee ? [{
-                userName: tm.task.assignee.name,
-                userEmail: tm.task.assignee.email,
-              }] : [],
-            }));
-          },
-        }),
+    // ✅ Inicializar Google Gemini con la API Key desde variables de entorno
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) {
+      console.error("❌ [AI API] Falta GOOGLE_GENERATIVE_AI_API_KEY en variables de entorno");
+      return new Response(
+        JSON.stringify({ error: "API Key de Google no configurada" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash", // ✅ Modelo gratuito y rápido
+      systemInstruction: SYSTEM_PROMPT,
+    });
+
+    // ✅ Convertir mensajes al formato de Gemini
+    const geminiMessages = convertMessages(messages);
+
+    // ✅ Generar contenido con streaming
+    const result = await model.generateContentStream({
+      contents: geminiMessages,
+      generationConfig: {
+        maxOutputTokens: 800,
+        temperature: 0.7,
       },
     });
 
-    console.log("🚀 [AI API] Devolviendo stream a respuesta");
-    return result.toDataStreamResponse();
-    
+    // ✅ Convertir el stream de Gemini a formato SSE compatible con el frontend
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          let fullText = "";
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            fullText += text;
+            // Enviar en formato SSE compatible con useChat de Vercel AI
+            const data = JSON.stringify({ text });
+            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          }
+          // Señal de fin
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
+        } catch (error) {
+          console.error("💥 Error en stream:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     console.error("💥 ERROR CRÍTICO en AI Assistant:", error);
     return new Response(
-      JSON.stringify({ error: "Error interno del servidor", details: String(error) }), 
+      JSON.stringify({ error: "Error interno del servidor", details: String(error) }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

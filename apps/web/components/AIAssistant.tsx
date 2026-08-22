@@ -1,37 +1,109 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
 import { useSession } from "next-auth/react";
 import { MessageSquare, X, Send, Bot, User, Loader2, AlertCircle } from "lucide-react";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
 export default function AIAssistant() {
   const { data: session } = useSession();
   const userName = session?.user?.name?.split(" ")[0] || "amigo";
 
   const [isOpen, setIsOpen] = useState(false);
-  
-  // ✅ Agregamos onError y onFinish para capturar exactamente qué pasa
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error, reload } = useChat({
-    api: "/api/ai-assistant",
-    onError: (err) => {
-      console.error("❌ ERROR EN EL CHAT:", err);
-    },
-    onFinish: (message) => {
-      console.log("✅ MENSAJE RECIBIDO EXITOSAMENTE:", message);
-    }
-  });
-  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Debugging: ver cambios de estado en la consola
-  useEffect(() => {
-    console.log("🔄 Estado del Chat - isLoading:", isLoading, "error:", error, "mensajes:", messages.length);
-  }, [isLoading, error, messages]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input.trim(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Error del servidor");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+
+      // ✅ Mensaje del asistente vacío al inicio
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "",
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter((line) => line.startsWith("data: "));
+
+          for (const line of lines) {
+            const data = line.replace("data: ", "").trim();
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.text) {
+                assistantContent += parsed.text;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  if (lastMsg && lastMsg.role === "assistant") {
+                    lastMsg.content = assistantContent;
+                  }
+                  return updated;
+                });
+              }
+            } catch {
+              // Ignorar chunks no parseables
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("❌ ERROR EN EL CHAT:", err);
+      setError(err.message || "Error de conexión");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <>
@@ -56,13 +128,12 @@ export default function AIAssistant() {
                 <p className="text-[10px] text-cyan-100">Pregúntame sobre el sistema</p>
               </div>
             </div>
-            {/* ✅ Botón de reintentar si hay error */}
             {error && (
-              <button 
-                onClick={() => reload()} 
+              <button
+                onClick={() => setError(null)}
                 className="text-[10px] bg-red-500/20 text-red-200 px-2 py-1 rounded hover:bg-red-500/30 transition-colors"
               >
-                Reintentar
+                Cerrar
               </button>
             )}
           </div>
@@ -84,13 +155,12 @@ export default function AIAssistant() {
               </div>
             )}
 
-            {/* ✅ Mensaje de error visible para el usuario */}
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs text-red-300 font-semibold">Error de conexión</p>
-                  <p className="text-[10px] text-red-400/80">No pude obtener una respuesta. Haz clic en "Reintentar" o verifica la consola (F12).</p>
+                  <p className="text-[10px] text-red-400/80">{error}</p>
                 </div>
               </div>
             )}
@@ -112,7 +182,7 @@ export default function AIAssistant() {
                       : "bg-slate-800 text-slate-200 rounded-bl-none"
                   }`}
                 >
-                  {message.content}
+                  {message.content || (message.role === "assistant" && isLoading ? "Pensando..." : "")}
                 </div>
                 {message.role === "user" && (
                   <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center flex-shrink-0">
@@ -122,7 +192,7 @@ export default function AIAssistant() {
               </div>
             ))}
 
-            {isLoading && (
+            {isLoading && messages[messages.length - 1]?.role === "user" && (
               <div className="flex gap-2">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-white" />
@@ -141,7 +211,7 @@ export default function AIAssistant() {
             <div className="flex gap-2">
               <input
                 value={input}
-                onChange={handleInputChange}
+                onChange={(e) => setInput(e.target.value)}
                 placeholder="Escribe tu pregunta..."
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 disabled:opacity-50"
                 disabled={isLoading}

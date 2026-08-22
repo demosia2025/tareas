@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/openai": "0.0.70",
     "@auth/prisma-adapter": "^2.11.3",
+    "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@pm-saas/sync-engine": "workspace:*",
     "ai": "3.4.33",
