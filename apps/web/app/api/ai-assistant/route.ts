@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     // Llamar a Groq con streaming
     const stream = await groq.chat.completions.create({
       messages: groqMessages,
-      model: "llama-3.1-8b-instant",
+     model: "llama3-8b-8192", // ✅ Modelo correcto y siempre disponible
       temperature: 0.7,
       max_tokens: 800,
       stream: true,
