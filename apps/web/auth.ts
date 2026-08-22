@@ -73,5 +73,11 @@ const authConfig: NextAuthConfig = {
   debug: process.env.NODE_ENV === "development",
 };
 
-// @ts-ignore
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+const nextAuth = NextAuth(authConfig);
+
+export const { handlers, auth, signIn, signOut } = nextAuth as {
+  handlers: typeof nextAuth.handlers;
+  auth: any;
+  signIn: typeof nextAuth.signIn;
+  signOut: typeof nextAuth.signOut;
+};
