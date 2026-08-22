@@ -142,6 +142,9 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
+      groq-sdk:
+        specifier: ^1.5.0
+        version: 1.5.0
       lucide-react:
         specifier: ^1.28.0
         version: 1.28.0(react@19.2.8)
@@ -3926,6 +3929,11 @@ packages:
 
   /graphmatch@1.1.1:
     resolution: {integrity: sha512-5ykVn/EXM1hF0XCaWh05VbYvEiOL2lY1kBxZtaYsyvjp7cmWOU1XsAdfQBwClraEofXDT197lFbXOEVMHpvQOg==}
+
+  /groq-sdk@1.5.0:
+    resolution: {integrity: sha512-aa5yaMVd8kehBacU3Pp7roObOuPksZNau+nPW+GDDB7OV/8jybVzeeOv54lZj8owNNIc3a7Tu2eYI7/kIwtMNw==}
+    hasBin: true
+    dev: false
 
   /has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
