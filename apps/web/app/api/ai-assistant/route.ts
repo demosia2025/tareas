@@ -1,5 +1,4 @@
-import { createGroq } from "@ai-sdk/groq";
-import { streamText } from "ai";
+import Groq from "groq-sdk";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -30,8 +29,8 @@ export async function POST(req: Request) {
     }
 
     const { messages } = await req.json();
-
     const apiKey = process.env.GROQ_API_KEY;
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "Falta GROQ_API_KEY en las variables de entorno" }),
@@ -39,18 +38,53 @@ export async function POST(req: Request) {
       );
     }
 
-    // Instancia el cliente de Groq de forma explícita
-    const groq = createGroq({ apiKey });
+    // Usar directamente el cliente nativo de Groq
+    const groq = new Groq({ apiKey });
 
-    const result = await streamText({
-      model: groq("llama-3.1-8b-instant") as any,
-      system: SYSTEM_PROMPT,
-      messages,
-      maxTokens: 800,
+    // Adaptar mensajes al formato de Groq
+    const groqMessages = [
+      { role: "system" as const, content: SYSTEM_PROMPT },
+      ...messages.map((m: any) => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: m.content || "",
+      })),
+    ];
+
+    const stream = await groq.chat.completions.create({
+      messages: groqMessages,
+      model: "llama-3.1-8b-instant",
       temperature: 0.7,
+      max_tokens: 800,
+      stream: true,
     });
 
-    return result.toDataStreamResponse();
+    // Formatear stream según el protocolo que espera Vercel AI SDK / useChat
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              // Formato de Vercel AI SDK Data Stream Protocol (0:"texto\n")
+              controller.enqueue(encoder.encode(`0:${JSON.stringify(content)}\n`));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          console.error("💥 Error en streaming de Groq:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "x-vercel-ai-ui-stream": "true",
+        "Cache-Control": "no-cache",
+      },
+    });
   } catch (error: any) {
     console.error("💥 ERROR CRÍTICO en AI Assistant:", error?.message);
     return new Response(
