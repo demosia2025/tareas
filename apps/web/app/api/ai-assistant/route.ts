@@ -38,10 +38,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Usar directamente el cliente nativo de Groq
     const groq = new Groq({ apiKey });
 
-    // Adaptar mensajes al formato de Groq
     const groqMessages = [
       { role: "system" as const, content: SYSTEM_PROMPT },
       ...messages.map((m: any) => ({
@@ -52,13 +50,12 @@ export async function POST(req: Request) {
 
     const stream = await groq.chat.completions.create({
       messages: groqMessages,
-      model: "llama-3.1-8b-instant",
+      model: "llama3-8b-8192",
       temperature: 0.7,
       max_tokens: 800,
       stream: true,
     });
 
-    // Formatear stream según el protocolo que espera Vercel AI SDK / useChat
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
@@ -66,7 +63,6 @@ export async function POST(req: Request) {
           for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content;
             if (content) {
-              // Formato de Vercel AI SDK Data Stream Protocol (0:"texto\n")
               controller.enqueue(encoder.encode(`0:${JSON.stringify(content)}\n`));
             }
           }
