@@ -16,9 +16,7 @@ const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una ap
 ## Instrucciones:
 - Responde SIEMPRE en español.
 - Sé conciso y claro (máximo 3-4 oraciones por respuesta).
-- Usa las herramientas disponibles para consultar datos REALES del usuario.
-- NUNCA inventes datos sobre tareas o usuarios específicos.
-`;
+- NUNCA inventes datos sobre tareas o usuarios específicos.`;
 
 export async function POST(req: Request) {
   try {
@@ -35,25 +33,26 @@ export async function POST(req: Request) {
 
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "Falta GROQ_API_KEY en Vercel" }),
+        JSON.stringify({ error: "Falta GROQ_API_KEY en las variables de entorno" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
     const groq = new Groq({ apiKey });
 
+    // Preparar el array de mensajes para Groq
     const groqMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system" as const, content: SYSTEM_PROMPT },
       ...messages.map((m: any) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: m.content || "",
       })),
     ];
 
-    // ✅ MODELO ACTUAL, GRATUITO Y ESTABLE DE GROQ
+    // Crear la transmisión desde Groq
     const stream = await groq.chat.completions.create({
       messages: groqMessages,
-      model: "llama-3.1-8b-instant", // ✅ Modelo gratuito, estable y con altos límites 
+      model: "llama-3.1-8b-instant", // Modelo 100% gratuito de Groq
       temperature: 0.7,
       max_tokens: 800,
       stream: true,
@@ -64,16 +63,15 @@ export async function POST(req: Request) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content || "";
-            if (text) {
-              const data = JSON.stringify({ text });
-              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+              // Enviar el fragmento directamente codificado
+              controller.enqueue(encoder.encode(content));
             }
           }
-          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
         } catch (error) {
-          console.error("💥 Error en stream de Groq:", error);
+          console.error("💥 Error en streaming de Groq:", error);
           controller.error(error);
         }
       },
@@ -81,9 +79,8 @@ export async function POST(req: Request) {
 
     return new Response(readableStream, {
       headers: {
-        "Content-Type": "text/event-stream",
+        "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
-        Connection: "keep-alive",
       },
     });
   } catch (error: any) {
