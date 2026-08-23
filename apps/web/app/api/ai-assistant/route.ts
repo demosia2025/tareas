@@ -1,22 +1,9 @@
-import Groq from "groq-sdk";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
 
 const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una aplicación SaaS para gestión de proyectos.
-
-## TUS CONOCIMIENTOS:
-- **Organización**: Entidad principal. Contiene workspaces.
-- **Workspace**: Espacio de trabajo. Tiene miembros con roles (owner, admin, member).
-- **Space (Espacio)**: Contenedor dentro del workspace.
-- **Folder (Carpeta)**: Sub-organización dentro de un espacio.
-- **List (Lista)**: Contiene las tareas.
-- **Task (Tarea)**: Unidad de trabajo con estado (todo, in_progress, done), prioridad (low, medium, high, urgent) y asignados.
-
-## Instrucciones:
-- Responde SIEMPRE en español.
-- Sé conciso y claro (máximo 3-4 oraciones por respuesta).
-- NUNCA inventes datos sobre tareas o usuarios específicos.`;
+Responde SIEMPRE en español y de forma concisa (máximo 3 oraciones).`;
 
 export async function POST(req: Request) {
   try {
@@ -28,63 +15,59 @@ export async function POST(req: Request) {
       });
     }
 
-    const { messages } = await req.json();
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = (process.env.MISTRAL_API_KEY || "").trim();
 
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "Falta GROQ_API_KEY en las variables de entorno" }),
+        JSON.stringify({ error: "Falta MISTRAL_API_KEY en .env.local" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const groq = new Groq({ apiKey });
+    const { messages } = await req.json();
 
-    const groqMessages = [
-      { role: "system" as const, content: SYSTEM_PROMPT },
-      ...messages.map((m: any) => ({
-        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: m.content || "",
-      })),
-    ];
+    const formattedMessages = Array.isArray(messages)
+      ? messages.map((m: any) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: String(m.content || ""),
+        }))
+      : [];
 
-    const stream = await groq.chat.completions.create({
-      messages: groqMessages,
-      model: "llama3-8b-8192",
-      temperature: 0.7,
-      max_tokens: 800,
-      stream: true,
-    });
-
-    const encoder = new TextEncoder();
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-              controller.enqueue(encoder.encode(`0:${JSON.stringify(content)}\n`));
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error("💥 Error en streaming de Groq:", error);
-          controller.error(error);
-        }
-      },
-    });
-
-    return new Response(readableStream, {
+    const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "x-vercel-ai-ui-stream": "true",
-        "Cache-Control": "no-cache",
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        model: "mistral-small-latest",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...formattedMessages,
+        ],
+        temperature: 0.5,
+        max_tokens: 500,
+      }),
     });
-  } catch (error: any) {
-    console.error("💥 ERROR CRÍTICO en AI Assistant:", error?.message);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({ error: data?.error?.message || "Error devuelto por Mistral" }),
+        { status: response.status, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const responseContent = data.choices?.[0]?.message?.content || "Sin respuesta.";
+
     return new Response(
-      JSON.stringify({ error: "Error interno", details: error?.message }),
+      JSON.stringify({ role: "assistant", content: responseContent }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({ error: error?.message || "Error interno del servidor" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

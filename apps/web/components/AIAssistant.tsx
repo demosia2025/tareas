@@ -49,54 +49,20 @@ export default function AIAssistant() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Error del servidor");
+        throw new Error(data.error || "Error del servidor");
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = "";
-
-      // ✅ Mensaje del asistente vacío al inicio
+      // Agregar la respuesta del asistente obtenida desde la API en formato JSON
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "",
+        content: data.content || "",
       };
+
       setMessages((prev) => [...prev, assistantMessage]);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter((line) => line.startsWith("data: "));
-
-          for (const line of lines) {
-            const data = line.replace("data: ", "").trim();
-            if (data === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                assistantContent += parsed.text;
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const lastMsg = updated[updated.length - 1];
-                  if (lastMsg && lastMsg.role === "assistant") {
-                    lastMsg.content = assistantContent;
-                  }
-                  return updated;
-                });
-              }
-            } catch {
-              // Ignorar chunks no parseables
-            }
-          }
-        }
-      }
     } catch (err: any) {
       console.error("❌ ERROR EN EL CHAT:", err);
       setError(err.message || "Error de conexión");
@@ -182,7 +148,7 @@ export default function AIAssistant() {
                       : "bg-slate-800 text-slate-200 rounded-bl-none"
                   }`}
                 >
-                  {message.content || (message.role === "assistant" && isLoading ? "Pensando..." : "")}
+                  {message.content}
                 </div>
                 {message.role === "user" && (
                   <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center flex-shrink-0">
@@ -192,7 +158,7 @@ export default function AIAssistant() {
               </div>
             ))}
 
-            {isLoading && messages[messages.length - 1]?.role === "user" && (
+            {isLoading && (
               <div className="flex gap-2">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-white" />
