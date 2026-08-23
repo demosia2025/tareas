@@ -1,4 +1,5 @@
-import Groq from "groq-sdk";
+import { groq } from "@ai-sdk/groq";
+import { streamText } from "ai";
 import { auth } from "@/auth";
 
 export const runtime = "nodejs";
@@ -29,60 +30,23 @@ export async function POST(req: Request) {
     }
 
     const { messages } = await req.json();
-    const apiKey = process.env.GROQ_API_KEY;
 
-    if (!apiKey) {
+    if (!process.env.GROQ_API_KEY) {
       return new Response(
         JSON.stringify({ error: "Falta GROQ_API_KEY en las variables de entorno" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const groq = new Groq({ apiKey });
-
-    // Preparar el array de mensajes para Groq
-    const groqMessages = [
-      { role: "system" as const, content: SYSTEM_PROMPT },
-      ...messages.map((m: any) => ({
-        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: m.content || "",
-      })),
-    ];
-
-    // Crear la transmisión desde Groq
-    const stream = await groq.chat.completions.create({
-      messages: groqMessages,
-      model: "llama-3.1-8b-instant", // Modelo 100% gratuito de Groq
+    const result = await streamText({
+      model: groq("llama-3.1-8b-instant") as any,
+      system: SYSTEM_PROMPT,
+      messages,
+      maxTokens: 800,
       temperature: 0.7,
-      max_tokens: 800,
-      stream: true,
     });
 
-    const encoder = new TextEncoder();
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-              // Enviar el fragmento directamente codificado
-              controller.enqueue(encoder.encode(content));
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error("💥 Error en streaming de Groq:", error);
-          controller.error(error);
-        }
-      },
-    });
-
-    return new Response(readableStream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-      },
-    });
+    return result.toDataStreamResponse();
   } catch (error: any) {
     console.error("💥 ERROR CRÍTICO en AI Assistant:", error?.message);
     return new Response(
