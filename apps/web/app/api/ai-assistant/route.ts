@@ -1,4 +1,4 @@
-import { groq } from "@ai-sdk/groq";
+import { createGroq } from "@ai-sdk/groq";
 import { streamText } from "ai";
 import { auth } from "@/auth";
 
@@ -31,12 +31,16 @@ export async function POST(req: Request) {
 
     const { messages } = await req.json();
 
-    if (!process.env.GROQ_API_KEY) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
       return new Response(
         JSON.stringify({ error: "Falta GROQ_API_KEY en las variables de entorno" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
+
+    // Instancia el cliente de Groq de forma explícita
+    const groq = createGroq({ apiKey });
 
     const result = await streamText({
       model: groq("llama-3.1-8b-instant") as any,
