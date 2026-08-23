@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     // ✅ MODELO ACTUAL, GRATUITO Y ESTABLE DE GROQ
     const stream = await groq.chat.completions.create({
       messages: groqMessages,
-      model: "llama-3.3-70b-versatile", 
+      model: "llama-3.1-8b-instant", // ✅ Modelo gratuito, estable y con altos límites 
       temperature: 0.7,
       max_tokens: 800,
       stream: true,
