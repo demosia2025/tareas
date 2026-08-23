@@ -18,16 +18,12 @@ const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas", una ap
 - Sé conciso y claro (máximo 3-4 oraciones por respuesta).
 - Usa las herramientas disponibles para consultar datos REALES del usuario.
 - NUNCA inventes datos sobre tareas o usuarios específicos.
-- Si no sabes algo, di "No tengo información sobre eso, pero puedes consultar la documentación o contactar al administrador".
 `;
 
 export async function POST(req: Request) {
   try {
-    console.log("🔍 [AI API] Iniciando petición con Groq...");
-
     const session = await auth();
     if (!session?.user?.id) {
-      console.warn("️ [AI API] Usuario no autenticado");
       return new Response(JSON.stringify({ error: "No autorizado" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -37,20 +33,15 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
     const apiKey = process.env.GROQ_API_KEY;
 
-    console.log("🔑 [AI API] Groq API Key presente:", !!apiKey);
-
     if (!apiKey) {
-      console.error("❌ [AI API] Falta GROQ_API_KEY en variables de entorno");
       return new Response(
         JSON.stringify({ error: "Falta GROQ_API_KEY en Vercel" }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Inicializar cliente de Groq
     const groq = new Groq({ apiKey });
 
-    // Preparar mensajes para Groq
     const groqMessages = [
       { role: "system", content: SYSTEM_PROMPT },
       ...messages.map((m: any) => ({
@@ -59,20 +50,15 @@ export async function POST(req: Request) {
       })),
     ];
 
-    console.log(" [AI API] Enviando a Groq (modelo: llama-3.1-8b-instant)...");
-
-    // Llamar a Groq con streaming
+    // ✅ MODELO ACTUAL, GRATUITO Y ESTABLE DE GROQ
     const stream = await groq.chat.completions.create({
       messages: groqMessages,
-     model: "llama3-8b-8192", // ✅ Modelo correcto y siempre disponible
+      model: "llama-3.3-70b-versatile", 
       temperature: 0.7,
       max_tokens: 800,
       stream: true,
     });
 
-    console.log("✅ [AI API] Stream iniciado, enviando respuesta...");
-
-    // Convertir el stream de Groq al formato SSE
     const encoder = new TextEncoder();
     const readableStream = new ReadableStream({
       async start(controller) {
@@ -86,9 +72,8 @@ export async function POST(req: Request) {
           }
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
-          console.log("✅ [AI API] Stream completado exitosamente");
         } catch (error) {
-          console.error("💥 [AI API] Error en stream:", error);
+          console.error("💥 Error en stream de Groq:", error);
           controller.error(error);
         }
       },
@@ -102,8 +87,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: any) {
-    console.error("💥 [AI API] ERROR CRÍTICO:", error?.message);
-    console.error("💥 [AI API] Stack:", error?.stack);
+    console.error("💥 ERROR CRÍTICO en AI Assistant:", error?.message);
     return new Response(
       JSON.stringify({ error: "Error interno", details: error?.message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
