@@ -37,9 +37,8 @@
 }
 
 /* ==========================================
-   RESPONSIVIDAD REAL - MOBILE FIRST
+   BASE RESPONSIVE
    ========================================== */
-
 html, body {
   height: 100%;
   background: #0b0f19;
@@ -53,9 +52,10 @@ html, body {
   flex-direction: column;
 }
 
-/* MÓVIL (< 768px) */
+/* ==========================================
+   MÓVIL (< 768px)
+   ========================================== */
 @media (max-width: 768px) {
-  /* Permitir scroll en todo el body */
   html, body {
     overflow-y: auto !important;
     height: auto !important;
@@ -66,7 +66,7 @@ html, body {
     overflow: visible !important;
   }
 
-  /* Sidebar como drawer */
+  /* Sidebar oculto en móvil por defecto */
   .sidebar-desktop {
     display: none !important;
   }
@@ -81,19 +81,21 @@ html, body {
     bottom: 0;
     background: rgba(0, 0, 0, 0.7);
     z-index: 40;
+    backdrop-filter: blur(4px);
   }
 
   .sidebar-overlay.show {
     display: block;
   }
 
-  /* Botones más grandes para touch */
+  /* Botones táctiles grandes */
   button, a, .clickable {
     min-height: 48px;
     min-width: 48px;
+    padding: 12px 16px;
   }
 
-  /* Inputs más grandes */
+  /* Inputs grandes para evitar zoom en iOS */
   input, textarea, select {
     font-size: 16px !important;
     padding: 12px;
@@ -105,17 +107,19 @@ html, body {
     gap: 1rem;
   }
 
-  /* Modales a pantalla casi completa */
-  .modal-container {
+  /* Modales responsive */
+  .modal-container,
+  [class*="max-w-"] {
     width: 95% !important;
     max-width: none !important;
     margin: 1rem;
   }
 
-  /* Tablas con scroll horizontal */
+  /* Tablas scrollables */
   .table-wrapper {
     overflow-x: auto;
     display: block;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Header compacto */
@@ -124,24 +128,31 @@ html, body {
     padding: 0 0.75rem !important;
   }
 
-  /* Textos más pequeños */
-  h1 {
-    font-size: 1.25rem !important;
-  }
-
-  h2 {
-    font-size: 1.125rem !important;
-  }
+  /* Textos responsive */
+  h1 { font-size: 1.25rem !important; }
+  h2 { font-size: 1.125rem !important; }
+  h3 { font-size: 1rem !important; }
+  
+  .text-xs { font-size: 0.75rem !important; }
+  .text-sm { font-size: 0.875rem !important; }
 }
 
-/* TABLET (768px - 1024px) */
+/* ==========================================
+   TABLET (768px - 1024px)
+   ========================================== */
 @media (min-width: 769px) and (max-width: 1024px) {
   .sidebar-desktop {
     width: 240px !important;
   }
+  
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
-/* DESKTOP (> 1024px) */
+/* ==========================================
+   DESKTOP (> 1024px)
+   ========================================== */
 @media (min-width: 1025px) {
   .sidebar-overlay {
     display: none !important;

@@ -262,26 +262,20 @@ export default function HomePage() {
   
   setIsCreatingFolder(true);
   try {
-    // ✅ VALIDACIÓN 1: Verificar que exista un workspace activo
     if (!dashboard.workspaceId) {
-      alert("⚠️ Error: No tienes un workspace activo. Crea un workspace primero.");
+      alert("⚠️ Error: No tienes un workspace activo.");
       setIsCreatingFolder(false);
       return;
     }
 
-    // ✅ VALIDACIÓN 2: Verificar que existan espacios
     if (!dashboard.spaces || dashboard.spaces.length === 0) {
-      alert("⚠️ Debes crear al menos un Espacio antes de poder crear una Carpeta.\n\nVe a 'Nuevo Espacio' en el menú principal y créalo primero.");
+      alert("⚠️ Debes crear al menos un Espacio primero.");
       setIsCreateFolderModalOpen(false);
       setIsCreatingFolder(false);
       return;
     }
 
-    // ✅ Determinar el espacio destino
-    let targetSpaceId = selectedSpaceForFolder;
-    if (!targetSpaceId) {
-      targetSpaceId = dashboard.spaces[0]?.id;
-    }
+    let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
 
     if (!targetSpaceId) {
       alert("⚠️ Error: No se pudo identificar un espacio válido.");
@@ -289,7 +283,6 @@ export default function HomePage() {
       return;
     }
 
-    // ✅ CREAR LA CARPETA
     const res = await fetch("/api/folders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -301,23 +294,22 @@ export default function HomePage() {
     });
 
     if (res.ok) {
-      // ✅ AUTO-REFRESH: Actualizar la jerarquía inmediatamente
+      // ✅ AUTO-REFRESH INMEDIATO
       await dashboard.fetchHierarchy();
       
-      // Cerrar modal y limpiar
       setIsCreateFolderModalOpen(false);
       setNewFolderName("");
       setSelectedSpaceForFolder("");
       
-      // ✅ Forzar actualización visual
-      alert("✅ Carpeta creada exitosamente. Se mostrará en el sidebar.");
+      // ✅ Notificación visual
+      alert("✅ Carpeta creada exitosamente");
     } else {
       const err = await res.json();
-      alert(`❌ Error al crear carpeta: ${err.error || "Error desconocido"}`);
+      alert(`❌ Error: ${err.error || "No se pudo crear"}`);
     }
   } catch (error) {
     console.error("Error creando carpeta:", error);
-    alert("❌ Error de conexión al crear la carpeta.");
+    alert("❌ Error de conexión");
   } finally {
     setIsCreatingFolder(false);
   }

@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <body className={`${inter.className} bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col antialiased overflow-x-hidden`}>
         <Providers>
-          <main className="flex-1 flex flex-col w-full overflow-y-auto">
+          <main className="flex-1 flex flex-col w-full overflow-y-auto md:overflow-hidden">
             {children}
           </main>
         </Providers>

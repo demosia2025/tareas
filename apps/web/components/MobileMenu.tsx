@@ -3,27 +3,29 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
-export default function MobileMenu({ children }: { children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
 
+export default function MobileMenu({ isOpen, onClose, children }: MobileMenuProps) {
   return (
     <>
-      {/* Botón hamburguesa - Solo visible en móvil */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800 rounded-lg"
-      >
-        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
-      
       {/* Overlay */}
       <div 
-        className={`sidebar-overlay ${isOpen ? 'show' : ''}`}
-        onClick={() => setIsOpen(false)}
+        className={`sidebar-overlay fixed inset-0 z-40 md:hidden transition-opacity ${
+          isOpen ? 'show opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
       />
       
-      {/* Sidebar con clase open/close */}
-      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+      {/* Sidebar móvil */}
+      <div 
+        className={`fixed top-0 left-0 h-full w-72 bg-slate-900 z-50 transform transition-transform duration-300 ease-in-out md:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         {children}
       </div>
     </>

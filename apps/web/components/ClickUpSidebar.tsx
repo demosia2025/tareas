@@ -100,12 +100,10 @@ export function ClickUpSidebar({
   const handleDeleteSpace = async (spaceId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("¿Estás seguro de que deseas eliminar este espacio y todo su contenido?")) return;
-
     try {
       const response = await fetch(`/api/spaces?id=${spaceId}`, { method: "DELETE" });
-      if (response.ok) {
-        fetchHierarchy();
-      } else {
+      if (response.ok) fetchHierarchy();
+      else {
         const data = await response.json();
         alert(data.error || "No tienes permisos para eliminar este espacio");
       }
@@ -117,7 +115,6 @@ export function ClickUpSidebar({
   const handleDeleteList = async (listId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("¿Estás seguro de que deseas eliminar esta lista?")) return;
-
     try {
       const response = await fetch(`/api/lists?id=${listId}`, { method: "DELETE" });
       if (response.ok) fetchHierarchy();
@@ -133,7 +130,6 @@ export function ClickUpSidebar({
   const handleDeleteFolder = async (folderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("¿Estás seguro de que deseas eliminar esta carpeta?")) return;
-
     try {
       const response = await fetch(`/api/folders?id=${folderId}`, { method: "DELETE" });
       if (response.ok) fetchHierarchy();
@@ -151,14 +147,12 @@ export function ClickUpSidebar({
       setEditingListId(null);
       return;
     }
-
     try {
       const response = await fetch(`/api/lists`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: listId, name: editingListName.trim() }),
       });
-
       if (response.ok) {
         setEditingListId(null);
         setEditingListName("");
@@ -177,14 +171,12 @@ export function ClickUpSidebar({
       setEditingFolderId(null);
       return;
     }
-
     try {
       const response = await fetch(`/api/folders`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: folderId, name: editingFolderName.trim() }),
       });
-
       if (response.ok) {
         setEditingFolderId(null);
         setEditingFolderName("");
@@ -201,35 +193,23 @@ export function ClickUpSidebar({
   const handleCreateSpace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSpaceName.trim()) return;
-
     try {
       const spaceResponse = await fetch("/api/spaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newSpaceName,
-          workspaceId: workspaceId,
-        }),
+        body: JSON.stringify({ name: newSpaceName, workspaceId: workspaceId }),
       });
-
       if (spaceResponse.ok) {
         const createdSpace = await spaceResponse.json();
-
         const listResponse = await fetch("/api/lists", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: "General",
-            spaceId: createdSpace.id,
-            workspaceId: workspaceId,
-          }),
+          body: JSON.stringify({ name: "General", spaceId: createdSpace.id, workspaceId: workspaceId }),
         });
-
         if (listResponse.ok) {
           const createdList = await listResponse.json();
           onSelectList({ id: createdList.id, name: createdList.name, spaceId: createdSpace.id });
         }
-
         await fetchHierarchy();
         setNewSpaceName("");
         setShowCreateSpace(false);
@@ -247,22 +227,15 @@ export function ClickUpSidebar({
       setActiveSpaceForList(null);
       return;
     }
-
     const nameToSubmit = newListName.trim();
     setNewListName("");
     setActiveSpaceForList(null);
-
     try {
       const response = await fetch("/api/lists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameToSubmit,
-          spaceId: spaceId,
-          workspaceId: workspaceId,
-        }),
+        body: JSON.stringify({ name: nameToSubmit, spaceId: spaceId, workspaceId: workspaceId }),
       });
-
       if (response.ok) {
         const createdList = await response.json();
         await fetchHierarchy();
@@ -278,23 +251,15 @@ export function ClickUpSidebar({
       setActiveFolderForList(null);
       return;
     }
-
     const nameToSubmit = newListName.trim();
     setNewListName("");
     setActiveFolderForList(null);
-
     try {
       const response = await fetch("/api/lists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameToSubmit,
-          spaceId: spaceId,
-          workspaceId: workspaceId,
-          folderId: folderId,
-        }),
+        body: JSON.stringify({ name: nameToSubmit, spaceId: spaceId, workspaceId: workspaceId, folderId: folderId }),
       });
-
       if (response.ok) {
         const createdList = await response.json();
         await fetchHierarchy();
@@ -305,56 +270,50 @@ export function ClickUpSidebar({
     }
   };
 
-  // ✅ MEJORA DEFENSIVA: Validación robusta antes de crear la carpeta
- const handleCreateFolderInSpace = async (spaceId: string) => {
-  if (!newFolderName.trim()) {
-    setActiveSpaceForFolder(null);
-    return;
-  }
-
-  if (!workspaceId || !spaceId) {
-    alert("❌ Error: Falta el ID del espacio o workspace para crear la carpeta.");
-    setActiveSpaceForFolder(null);
-    return;
-  }
-
-  const nameToSubmit = newFolderName.trim();
-  setNewFolderName("");
-  setActiveSpaceForFolder(null);
-
-  try {
-    const response = await fetch("/api/folders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: nameToSubmit,
-        spaceId: spaceId,
-        workspaceId: workspaceId,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // ✅ AUTO-REFRESH: Recargar la jerarquía inmediatamente
-      await fetchHierarchy();
-      
-      // ✅ Expandir el espacio para mostrar la nueva carpeta
-      setExpandedSpaces(prev => {
-        const newSet = new Set(prev);
-        newSet.add(spaceId);
-        return newSet;
-      });
-      
-      alert("✅ Carpeta creada exitosamente en el espacio.");
-    } else {
-      alert(`❌ No se pudo crear la carpeta: ${data.error || "Error desconocido"}`);
+  // ✅ FUNCIÓN COMPLETA Y CORRECTA PARA CREAR CARPETA DESDE EL SIDEBAR
+  const handleCreateFolderInSpace = async (spaceId: string) => {
+    if (!newFolderName.trim()) {
+      setActiveSpaceForFolder(null);
+      return;
     }
-  } catch (error) {
-    console.error("Error creando carpeta:", error);
-    alert("❌ Error de red al crear la carpeta.");
-  }
-};
+
+    if (!workspaceId || !spaceId) {
+      alert("❌ Error: Datos incompletos");
+      setActiveSpaceForFolder(null);
+      return;
+    }
+
+    const nameToSubmit = newFolderName.trim();
+    setNewFolderName("");
+    setActiveSpaceForFolder(null);
+
+    try {
+      const response = await fetch("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: nameToSubmit,
+          spaceId: spaceId,
+          workspaceId: workspaceId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // ✅ AUTO-REFRESH INMEDIATO
+        await fetchHierarchy();
+        // ✅ Expandir el espacio automáticamente para mostrar la nueva carpeta
+        setExpandedSpaces(prev => new Set(prev).add(spaceId));
+        alert("✅ Carpeta creada exitosamente");
+      } else {
+        alert(`❌ Error: ${data.error || "No se pudo crear"}`);
+      }
+    } catch (error) {
+      console.error("Error creando carpeta:", error);
+      alert("❌ Error de red");
+    }
+  };
 
   const toggleSpace = (spaceId: string) => {
     const newExpanded = new Set(expandedSpaces);
@@ -385,9 +344,7 @@ export function ClickUpSidebar({
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-xs font-bold text-white truncate tracking-wide">Mi Workspace</h2>
-            <p className="text-[11px] text-slate-400 truncate">
-              {organizationName}
-            </p>
+            <p className="text-[11px] text-slate-400 truncate">{organizationName}</p>
           </div>
         </div>
       </div>
@@ -408,19 +365,14 @@ export function ClickUpSidebar({
           {spaces.map((space) => (
             <div key={space.id} className="space-y-0.5">
               <div className="flex items-center group/space relative rounded-xl hover:bg-slate-800/60 border border-transparent hover:border-slate-700/40 transition-all">
-                <button
-                  onClick={() => toggleSpace(space.id)}
-                  className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left"
-                >
+                <button onClick={() => toggleSpace(space.id)} className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left">
                   {expandedSpaces.has(space.id) ? (
                     <ChevronDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                   ) : (
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                   )}
                   <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50 flex-shrink-0"></div>
-                  <span className="flex-1 text-xs font-semibold text-slate-200 truncate group-hover/space:text-white">
-                    {space.name}
-                  </span>
+                  <span className="flex-1 text-xs font-semibold text-slate-200 truncate group-hover/space:text-white">{space.name}</span>
                 </button>
                 
                 <div className="opacity-0 group-hover/space:opacity-100 flex items-center gap-0.5 mr-1 transition-opacity">
@@ -473,13 +425,8 @@ export function ClickUpSidebar({
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleCreateFolderInSpace(space.id);
-                      } else if (e.key === "Escape") {
-                        setActiveSpaceForFolder(null);
-                        setNewFolderName("");
-                      }
+                      if (e.key === "Enter") { e.preventDefault(); handleCreateFolderInSpace(space.id); } 
+                      else if (e.key === "Escape") { setActiveSpaceForFolder(null); setNewFolderName(""); }
                     }}
                     placeholder="Nombre de carpeta..."
                     className="w-full bg-slate-950 border border-amber-500/50 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
@@ -495,13 +442,8 @@ export function ClickUpSidebar({
                     value={newListName}
                     onChange={(e) => setNewListName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleCreateListInSpace(space.id);
-                      } else if (e.key === "Escape") {
-                        setActiveSpaceForList(null);
-                        setNewListName("");
-                      }
+                      if (e.key === "Enter") { e.preventDefault(); handleCreateListInSpace(space.id); } 
+                      else if (e.key === "Escape") { setActiveSpaceForList(null); setNewListName(""); }
                     }}
                     placeholder="Nombre de lista..."
                     className="w-full bg-slate-950 border border-cyan-500/50 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
@@ -522,10 +464,7 @@ export function ClickUpSidebar({
                             onChange={(e) => setEditingFolderName(e.target.value)}
                             onBlur={() => handleUpdateFolder(folder.id)}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleUpdateFolder(folder.id);
-                              }
+                              if (e.key === "Enter") { e.preventDefault(); handleUpdateFolder(folder.id); }
                               if (e.key === "Escape") setEditingFolderId(null);
                             }}
                             className="w-full bg-slate-950 border border-amber-500/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
@@ -542,10 +481,7 @@ export function ClickUpSidebar({
                               <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
                             )}
                             <Folder className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                            <span className="flex-1 text-xs text-slate-300 truncate group-hover/folder:text-white">
-                              {folder.name}
-                            </span>
-
+                            <span className="flex-1 text-xs text-slate-300 truncate group-hover/folder:text-white">{folder.name}</span>
                             <span
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -558,15 +494,10 @@ export function ClickUpSidebar({
                             >
                               <Plus className="w-3 h-3" />
                             </span>
-
                             {canModifyItem(folder.createdById) && (
                               <div className="opacity-0 group-hover/folder:opacity-100 flex items-center gap-1 mr-1">
                                 <span 
-                                  onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    setEditingFolderId(folder.id); 
-                                    setEditingFolderName(folder.name); 
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setEditingFolderId(folder.id); setEditingFolderName(folder.name); }}
                                   className="p-1 hover:text-amber-400 text-slate-400 transition-colors"
                                   title="Editar carpeta"
                                 >
@@ -592,13 +523,8 @@ export function ClickUpSidebar({
                             value={newListName}
                             onChange={(e) => setNewListName(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleCreateListInFolder(space.id, folder.id);
-                              } else if (e.key === "Escape") {
-                                setActiveFolderForList(null);
-                                setNewListName("");
-                              }
+                              if (e.key === "Enter") { e.preventDefault(); handleCreateListInFolder(space.id, folder.id); } 
+                              else if (e.key === "Escape") { setActiveFolderForList(null); setNewListName(""); }
                             }}
                             placeholder="Nombre de lista en carpeta..."
                             className="w-full bg-slate-950 border border-cyan-500/50 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none"
@@ -618,10 +544,7 @@ export function ClickUpSidebar({
                                   onChange={(e) => setEditingListName(e.target.value)}
                                   onBlur={() => handleUpdateList(list.id)}
                                   onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      handleUpdateList(list.id);
-                                    }
+                                    if (e.key === "Enter") { e.preventDefault(); handleUpdateList(list.id); }
                                     if (e.key === "Escape") setEditingListId(null);
                                   }}
                                   className="w-full bg-slate-950 border border-cyan-500/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
@@ -633,10 +556,7 @@ export function ClickUpSidebar({
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:border-cyan-500/20 border border-transparent transition-all text-left"
                                 >
                                   <List className="w-3.5 h-3.5 text-slate-400 group-hover/list:text-cyan-400 flex-shrink-0 transition-colors" />
-                                  <span className="flex-1 text-xs text-slate-300 truncate group-hover/list:text-white">
-                                    {list.name}
-                                  </span>
-                                  
+                                  <span className="flex-1 text-xs text-slate-300 truncate group-hover/list:text-white">{list.name}</span>
                                   {canModifyItem(list.createdById) && (
                                     <div className="opacity-0 group-hover/list:opacity-100 flex items-center gap-1 mr-1">
                                       <span 
@@ -655,7 +575,6 @@ export function ClickUpSidebar({
                                       </span>
                                     </div>
                                   )}
-
                                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700/60">
                                     {list._count?.tasks || 0}
                                   </span>
@@ -677,10 +596,7 @@ export function ClickUpSidebar({
                           onChange={(e) => setEditingListName(e.target.value)}
                           onBlur={() => handleUpdateList(list.id)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleUpdateList(list.id);
-                            }
+                            if (e.key === "Enter") { e.preventDefault(); handleUpdateList(list.id); }
                             if (e.key === "Escape") setEditingListId(null);
                           }}
                           className="w-full bg-slate-950 border border-cyan-500/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
@@ -692,10 +608,7 @@ export function ClickUpSidebar({
                           className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:border-cyan-500/20 border border-transparent transition-all text-left"
                         >
                           <List className="w-3.5 h-3.5 text-slate-400 group-hover/list:text-cyan-400 flex-shrink-0 transition-colors" />
-                          <span className="flex-1 text-xs text-slate-300 truncate group-hover/list:text-white">
-                            {list.name}
-                          </span>
-
+                          <span className="flex-1 text-xs text-slate-300 truncate group-hover/list:text-white">{list.name}</span>
                           {canModifyItem(list.createdById) && (
                             <div className="opacity-0 group-hover/list:opacity-100 flex items-center gap-1 mr-1">
                               <span 
@@ -714,7 +627,6 @@ export function ClickUpSidebar({
                               </span>
                             </div>
                           )}
-
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700/60">
                             {list._count?.tasks || 0}
                           </span>
