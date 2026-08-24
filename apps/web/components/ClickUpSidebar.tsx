@@ -272,7 +272,6 @@ export function ClickUpSidebar({
     }
   };
 
-  // ✅ FUNCIÓN CORREGIDA PARA CREAR CARPETA DESDE SIDEBAR
   const handleCreateFolderInSpace = async (spaceId: string) => {
     if (!newFolderName.trim()) {
       setActiveSpaceForFolder(null);
@@ -290,8 +289,6 @@ export function ClickUpSidebar({
     setActiveSpaceForFolder(null);
 
     try {
-      console.log("📁 Creando carpeta:", { name: nameToSubmit, spaceId, workspaceId });
-      
       const response = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -303,12 +300,10 @@ export function ClickUpSidebar({
       });
 
       const data = await response.json();
-      console.log("📥 Respuesta:", response.status, data);
 
       if (response.ok) {
         await fetchHierarchy();
         setExpandedSpaces(prev => new Set(prev).add(spaceId));
-        alert("✅ Carpeta creada exitosamente");
       } else {
         alert(`❌ Error: ${data.error || "No se pudo crear la carpeta"}`);
       }
@@ -380,16 +375,14 @@ export function ClickUpSidebar({
                 
                 <div className="opacity-0 group-hover/space:opacity-100 flex items-center gap-0.5 mr-1 transition-opacity">
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onOpenFolderModal) {
-                        onOpenFolderModal(space.id);
-                      } else {
-                        setActiveSpaceForFolder(space.id);
-                        setActiveSpaceForList(null);
-                        setNewFolderName("");
-                        setExpandedSpaces(prev => new Set(prev).add(space.id));
-                      }
+                      // Forzamos el estado local del input de carpeta (ignorando el onOpenFolderModal externo que impedía su visualización)
+                      setActiveSpaceForFolder(space.id);
+                      setActiveSpaceForList(null);
+                      setNewFolderName("");
+                      setExpandedSpaces(prev => new Set(prev).add(space.id));
                     }}
                     className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-700/60 rounded-lg transition-all"
                     title="Añadir carpeta a este espacio"
@@ -397,6 +390,7 @@ export function ClickUpSidebar({
                     <FolderPlus className="w-3.5 h-3.5" />
                   </button>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveSpaceForList(space.id);
@@ -411,6 +405,7 @@ export function ClickUpSidebar({
                   </button>
                   {canModifyItem(space.createdById) && (
                     <button
+                      type="button"
                       onClick={(e) => handleDeleteSpace(space.id, e)}
                       className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-700/60 rounded-lg transition-all"
                       title="Eliminar espacio"
@@ -492,7 +487,7 @@ export function ClickUpSidebar({
                                 setNewListName("");
                                 setExpandedFolders(prev => new Set(prev).add(folder.id));
                               }}
-                              className="opacity-0 group-hover/folder:opacity-100 p-1 hover:text-cyan-400 text-slate-400 transition-colors"
+                              className="opacity-0 group-hover/folder:opacity-100 p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
                               title="Añadir lista a esta carpeta"
                             >
                               <Plus className="w-3 h-3" />
@@ -501,14 +496,14 @@ export function ClickUpSidebar({
                               <div className="opacity-0 group-hover/folder:opacity-100 flex items-center gap-1 mr-1">
                                 <span 
                                   onClick={(e) => { e.stopPropagation(); setEditingFolderId(folder.id); setEditingFolderName(folder.name); }}
-                                  className="p-1 hover:text-amber-400 text-slate-400 transition-colors"
+                                  className="p-1 hover:text-amber-400 text-slate-400 transition-colors cursor-pointer"
                                   title="Editar carpeta"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </span>
                                 <span 
                                   onClick={(e) => handleDeleteFolder(folder.id, e)}
-                                  className="p-1 hover:text-rose-400 text-slate-400 transition-colors"
+                                  className="p-1 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
                                   title="Eliminar carpeta"
                                 >
                                   <Trash2 className="w-3 h-3" />
@@ -564,14 +559,14 @@ export function ClickUpSidebar({
                                     <div className="opacity-0 group-hover/list:opacity-100 flex items-center gap-1 mr-1">
                                       <span 
                                         onClick={(e) => { e.stopPropagation(); setEditingListId(list.id); setEditingListName(list.name); }}
-                                        className="p-1 hover:text-cyan-400 text-slate-400"
+                                        className="p-1 hover:text-cyan-400 text-slate-400 cursor-pointer"
                                         title="Editar lista"
                                       >
                                         <Edit2 className="w-3 h-3" />
                                       </span>
                                       <span 
                                         onClick={(e) => handleDeleteList(list.id, e)}
-                                        className="p-1 hover:text-rose-400 text-slate-400"
+                                        className="p-1 hover:text-rose-400 text-slate-400 cursor-pointer"
                                         title="Eliminar lista"
                                       >
                                         <Trash2 className="w-3 h-3" />
@@ -616,14 +611,14 @@ export function ClickUpSidebar({
                             <div className="opacity-0 group-hover/list:opacity-100 flex items-center gap-1 mr-1">
                               <span 
                                 onClick={(e) => { e.stopPropagation(); setEditingListId(list.id); setEditingListName(list.name); }}
-                                className="p-1 hover:text-cyan-400 text-slate-400 transition-colors"
+                                className="p-1 hover:text-cyan-400 text-slate-400 transition-colors cursor-pointer"
                                 title="Editar lista"
                               >
                                 <Edit2 className="w-3 h-3" />
                               </span>
                               <span 
                                 onClick={(e) => handleDeleteList(list.id, e)}
-                                className="p-1 hover:text-rose-400 text-slate-400 transition-colors"
+                                className="p-1 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
                                 title="Eliminar lista"
                               >
                                 <Trash2 className="w-3 h-3" />
