@@ -306,46 +306,55 @@ export function ClickUpSidebar({
   };
 
   // ✅ MEJORA DEFENSIVA: Validación robusta antes de crear la carpeta
-  const handleCreateFolderInSpace = async (spaceId: string) => {
-    if (!newFolderName.trim()) {
-      setActiveSpaceForFolder(null);
-      return;
-    }
-
-    if (!workspaceId || !spaceId) {
-      alert("⚠️ Error: Falta el ID del espacio o workspace para crear la carpeta.");
-      setActiveSpaceForFolder(null);
-      return;
-    }
-
-    const nameToSubmit = newFolderName.trim();
-    setNewFolderName("");
+ const handleCreateFolderInSpace = async (spaceId: string) => {
+  if (!newFolderName.trim()) {
     setActiveSpaceForFolder(null);
+    return;
+  }
 
-    try {
-      const response = await fetch("/api/folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameToSubmit,
-          spaceId: spaceId,
-          workspaceId: workspaceId,
-        }),
+  if (!workspaceId || !spaceId) {
+    alert("❌ Error: Falta el ID del espacio o workspace para crear la carpeta.");
+    setActiveSpaceForFolder(null);
+    return;
+  }
+
+  const nameToSubmit = newFolderName.trim();
+  setNewFolderName("");
+  setActiveSpaceForFolder(null);
+
+  try {
+    const response = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nameToSubmit,
+        spaceId: spaceId,
+        workspaceId: workspaceId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // ✅ AUTO-REFRESH: Recargar la jerarquía inmediatamente
+      await fetchHierarchy();
+      
+      // ✅ Expandir el espacio para mostrar la nueva carpeta
+      setExpandedSpaces(prev => {
+        const newSet = new Set(prev);
+        newSet.add(spaceId);
+        return newSet;
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        await fetchHierarchy();
-        setExpandedSpaces(prev => new Set(prev).add(spaceId));
-      } else {
-        alert(`❌ No se pudo crear la carpeta: ${data.error || "Error desconocido"}`);
-      }
-    } catch (error) {
-      console.error("Error creando carpeta:", error);
-      alert("❌ Error de red al crear la carpeta.");
+      
+      alert("✅ Carpeta creada exitosamente en el espacio.");
+    } else {
+      alert(`❌ No se pudo crear la carpeta: ${data.error || "Error desconocido"}`);
     }
-  };
+  } catch (error) {
+    console.error("Error creando carpeta:", error);
+    alert("❌ Error de red al crear la carpeta.");
+  }
+};
 
   const toggleSpace = (spaceId: string) => {
     const newExpanded = new Set(expandedSpaces);

@@ -37,15 +37,14 @@
 }
 
 /* ==========================================
-   BASE RESPONSIVA (Mobile First)
+   RESPONSIVIDAD REAL - MOBILE FIRST
    ========================================== */
+
 html, body {
   height: 100%;
   background: #0b0f19;
   color: #f1f5f9;
-  /* Permitir scroll vertical en móvil, evitar horizontal */
   overflow-x: hidden;
-  overflow-y: auto;
 }
 
 #__next {
@@ -54,48 +53,97 @@ html, body {
   flex-direction: column;
 }
 
-/* ==========================================
-   AJUSTES ESPECÍFICOS PARA MÓVIL (< 768px)
-   ========================================== */
+/* MÓVIL (< 768px) */
 @media (max-width: 768px) {
-  /* Forzar que los contenedores principales permitan scroll */
-  .main-container, .content-area {
+  /* Permitir scroll en todo el body */
+  html, body {
     overflow-y: auto !important;
     height: auto !important;
   }
 
-  /* Sidebar como drawer en móvil */
-  .sidebar-desktop {
-    display: none;
-  }
-  
-  /* Botones y áreas táctiles más grandes */
-  button, a, .clickable {
-    min-height: 44px;
-    min-width: 44px;
+  #__next {
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Inputs más grandes para evitar zoom en iOS */
+  /* Sidebar como drawer */
+  .sidebar-desktop {
+    display: none !important;
+  }
+
+  /* Overlay para cerrar sidebar */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 40;
+  }
+
+  .sidebar-overlay.show {
+    display: block;
+  }
+
+  /* Botones más grandes para touch */
+  button, a, .clickable {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Inputs más grandes */
   input, textarea, select {
     font-size: 16px !important;
-    padding: 0.75rem;
+    padding: 12px;
   }
 
-  /* Modales a pantalla casi completa en móvil */
+  /* Grids a una columna */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  /* Modales a pantalla casi completa */
   .modal-container {
     width: 95% !important;
     max-width: none !important;
     margin: 1rem;
   }
 
-  /* Grids a una sola columna */
-  .grid {
-    grid-template-columns: 1fr !important;
-  }
-
   /* Tablas con scroll horizontal */
   .table-wrapper {
     overflow-x: auto;
     display: block;
+  }
+
+  /* Header compacto */
+  header {
+    height: 56px !important;
+    padding: 0 0.75rem !important;
+  }
+
+  /* Textos más pequeños */
+  h1 {
+    font-size: 1.25rem !important;
+  }
+
+  h2 {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* TABLET (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar-desktop {
+    width: 240px !important;
+  }
+}
+
+/* DESKTOP (> 1024px) */
+@media (min-width: 1025px) {
+  .sidebar-overlay {
+    display: none !important;
   }
 }
