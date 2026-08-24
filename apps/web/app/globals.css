@@ -40,7 +40,7 @@ html, body {
 }
 
 /* ==========================================
-   MÓVIL (< 768px) - LAYOUT CORREGIDO
+   MÓVIL (< 768px) - LAYOUT FLUIDO Y SEGURO
    ========================================== */
 @media (max-width: 768px) {
   html, body {
@@ -55,9 +55,9 @@ html, body {
 
   /* Header compacto y ordenado en móvil */
   header {
-    min-height: 64px !important;
+    min-height: 60px !important;
     height: auto !important;
-    padding: 0.75rem 1rem !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   /* Sidebar como drawer overlay */
@@ -92,43 +92,36 @@ html, body {
     display: block;
   }
 
-  /* Botones táctiles grandes (mínimo 44px) */
-  button, a, .clickable {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 12px;
-  }
-
-  /* Inputs grandes para evitar zoom en iOS */
+  /* Inputs seguros para evitar zoom automático en iOS */
   input, textarea, select {
     font-size: 16px !important;
-    padding: 12px;
   }
 
-  /* Grids a una columna */
+  /* Ajuste inteligente de áreas táctiles solo en elementos principales */
+  button:not(.icon-btn), .btn-touch {
+    min-height: 40px;
+  }
+
+  /* Forzar grillas responsivas automáticas */
   .grid {
     grid-template-columns: 1fr !important;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
-  /* Modales responsive */
+  /* Modales adaptados al ancho de pantalla móvil */
   .modal-container {
-    width: 95% !important;
+    width: 92% !important;
     max-width: none !important;
-    margin: 1rem;
+    margin: auto;
+    max-height: 85vh;
+    overflow-y: auto;
   }
 
-  /* Textos responsive */
-  h1 { font-size: 1.5rem !important; }
-  h2 { font-size: 1.25rem !important; }
-  h3 { font-size: 1rem !important; }
-  
-  .text-xs { font-size: 0.75rem !important; }
-  .text-sm { font-size: 0.875rem !important; }
-  
-  /* Ocultar elementos no esenciales en móvil */
-  .hidden-mobile {
-    display: none !important;
+  /* Control de desbordamiento en tablas móviles */
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -140,7 +133,7 @@ html, body {
     width: 240px !important;
   }
   
-  .grid-cols-2 {
+  .grid-cols-2-tablet {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
@@ -151,9 +144,5 @@ html, body {
 @media (min-width: 1025px) {
   .sidebar-overlay {
     display: none !important;
-  }
-  
-  .hidden-mobile {
-    display: block !important;
   }
 }
