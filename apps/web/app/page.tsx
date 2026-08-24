@@ -29,9 +29,10 @@ export default function HomePage() {
   const router = useRouter();
   const dashboard = useDashboard();
 
-  // ✅ NUEVO: Clave para forzar la actualización del sidebar cuando se crea algo desde aquí
+  // ✅ CLAVE PARA FORZAR LA ACTUALIZACIÓN DEL SIDEBAR CUANDO SE CREA ALGO DESDE AQUÍ
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
+  // ESTADOS PARA MODALES DE CREACIÓN RÁPIDA
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -48,23 +49,29 @@ export default function HomePage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
+  // ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
+  // REFERENCIAS PARA LOS MENÚS
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
+  // DETECCIÓN SIMPLIFICADA
   const hasWorkspace = dashboard.workspaceId !== null;
 
+  // VERIFICAR LÍMITES
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
+  // REDIRECCIÓN SEGURA DE AUTENTICACIÓN
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
+  // CERRAR MENÚS AL HACER CLIC FUERA
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -76,6 +83,7 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dashboard.isProfileMenuOpen]);
 
+  // OBTENER TAREAS EN PARALELO SIN CONGELAR LA PÁGINA
   useEffect(() => {
     const fetchAllTasks = async () => {
       if (!dashboard.workspaceId || !dashboard.spaces || dashboard.spaces.length === 0) {
@@ -128,6 +136,7 @@ export default function HomePage() {
     fetchAllTasks();
   }, [dashboard.workspaceId, dashboard.spaces]);
 
+  // FUNCIONES DE CREACIÓN
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
@@ -289,8 +298,9 @@ export default function HomePage() {
       });
 
       if (res.ok) {
+        // ✅ AUTO-REFRESH INMEDIATO
         await dashboard.fetchHierarchy();
-        setSidebarRefreshKey(prev => prev + 1); // ✅ FIX: Esto hace que el sidebar se actualice al instante
+        setSidebarRefreshKey(prev => prev + 1); // ✅ Fuerza al sidebar a recargarse y mostrar la carpeta
         
         setIsCreateFolderModalOpen(false);
         setNewFolderName("");
@@ -312,6 +322,7 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
+  // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
@@ -320,17 +331,24 @@ export default function HomePage() {
     );
   }
 
+  // EVITA MOSTRAR CONTENIDO SI NO HAY SESIÓN
   if (status === "unauthenticated") {
     return null;
   }
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
-      {/* ✅ FIX: min-h-14 en lugar de h-14 para que el header crezca si los botones se acomod9n */}
-      <header className="min-h-14 sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
+      
+      {/* ✅ HEADER RESPONSIVE CORREGIDO: min-h-[64px] y flex-wrap para evitar superposiciones */}
+      <header className="min-h-[64px] sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
         <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 py-2">
+          
+          {/* Lado izquierdo: Menú hamburguesa + Logo */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} className="md:hidden p-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors">
+            <button 
+              onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
+              className="md:hidden p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
               <Menu className="w-5 h-5" />
             </button>
             
@@ -345,7 +363,7 @@ export default function HomePage() {
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/25 group-hover:scale-105 transition-transform">
                 <Zap className="w-4 h-4 text-white fill-white/20" />
               </div>
-              <div className="flex items-center space-x-2 sm:space-x-3 bg-slate-900/80 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm hidden sm:flex group-hover:bg-slate-800/80 transition-colors">
+              <div className="hidden sm:flex items-center space-x-2 sm:space-x-3 bg-slate-900/80 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm group-hover:bg-slate-800/80 transition-colors">
                 <span className="text-sm font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
                   Gestion de tareas
                 </span>
@@ -353,19 +371,26 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Lado derecho: Botones organizados con flex-wrap */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
-            {/* ✅ FIX: Botones Admin siempre visibles, texto más pequeño en móvil */}
+            {/* Botones Admin - Texto corto en móvil para evitar desbordamiento */}
             {dashboard.isOwner && (
-              <Link href="/admin2" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-cyan-400 transition-colors shadow-sm whitespace-nowrap">
-                <Shield className="w-3.5 h-3.5" />
-                <span>Administrador</span>
+              <Link 
+                href="/admin2" 
+                className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-cyan-400 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
+              >
+                <Shield className="w-3.5 h-3.5 hidden sm:block" />
+                <span>Admin</span>
               </Link>
             )}
             
             {dashboard.isSuperAdmin && (
-              <Link href="/admin" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl text-[10px] sm:text-xs font-semibold text-amber-300 transition-colors shadow-sm whitespace-nowrap">
-                <Shield className="w-3.5 h-3.5" />
-                <span>Super Admin</span>
+              <Link 
+                href="/admin" 
+                className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl text-[10px] sm:text-xs font-semibold text-amber-300 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
+              >
+                <Shield className="w-3.5 h-3.5 hidden sm:block" />
+                <span>Super</span>
               </Link>
             )}
 
@@ -404,16 +429,19 @@ export default function HomePage() {
             {dashboard.workspaceId && (
               <Link
                 href={`/workspace/${dashboard.workspaceId}/users`}
-                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
+                className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
                 title="Usuarios"
               >
-                <Users className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-cyan-400" />
+                <Users className="w-4 h-4 text-cyan-400" />
                 <span className="hidden sm:inline">Usuarios</span>
               </Link>
             )}
             
             <div className="relative" ref={profileMenuRef}>
-              <button onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} className="flex items-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2.5 py-1 rounded-xl hover:bg-slate-800/60 transition-all border border-slate-800/80 hover:border-slate-700/60 shadow-inner">
+              <button 
+                onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} 
+                className="flex items-center gap-1.5 px-1.5 py-1 sm:px-2.5 sm:py-1 rounded-xl hover:bg-slate-800/60 transition-all border border-slate-800/80 hover:border-slate-700/60 shadow-inner min-h-[36px]"
+              >
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-cyan-500/20">
                   {(session?.user?.name || "U")[0].toUpperCase()}
                 </div>
@@ -449,12 +477,29 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* ✅ LAYOUT PRINCIPAL RESPONSIVE CON SIDEBAR DRAWER */}
       <div className="flex flex-1 overflow-hidden relative">
-        {dashboard.isSidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" onClick={() => dashboard.setIsSidebarOpen(false)} />}
+        {/* Overlay oscuro para cerrar sidebar en móvil */}
+        {dashboard.isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" 
+            onClick={() => dashboard.setIsSidebarOpen(false)} 
+          />
+        )}
         
-        <aside className={`absolute md:relative z-30 h-full w-64 sm:w-72 flex-shrink-0 bg-slate-900/90 md:bg-slate-900/40 border-r border-slate-800/80 backdrop-blur-2xl transition-transform duration-300 ease-in-out flex flex-col overflow-hidden ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        {/* Sidebar: Drawer en móvil, fijo en desktop */}
+        <aside 
+          className={`
+            absolute md:relative z-30 h-full w-64 sm:w-72 flex-shrink-0 
+            bg-slate-900/90 md:bg-slate-900/40 
+            border-r border-slate-800/80 backdrop-blur-2xl 
+            transition-transform duration-300 ease-in-out 
+            flex flex-col overflow-hidden
+            ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          `}
+        >
           <div className="flex-1 overflow-y-auto">
-            {/* ✅ FIX: Pasamos sidebarRefreshKey para que se actualice cuando se crea algo desde el menú central */}
+            {/* ✅ CLAVE DE ACTUALIZACIÓN: Fuerza al sidebar a recargarse cuando se crea algo desde el menú central */}
             <ClickUpSidebar 
               key={sidebarRefreshKey}
               workspaceId={dashboard.workspaceId || ""} 
@@ -470,6 +515,7 @@ export default function HomePage() {
           </div>
         </aside>
 
+        {/* Contenido principal con scroll independiente */}
         <main className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
           {dashboard.selectedList ? (
             <>
@@ -738,6 +784,7 @@ export default function HomePage() {
         </main>
       </div>
 
+      {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
@@ -1042,6 +1089,7 @@ export default function HomePage() {
         />
       )}
 
+      {/* AGENTE IA FLOTANTE */}
       <AIAssistant />
     </div>
   );

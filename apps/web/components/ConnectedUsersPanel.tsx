@@ -1,6 +1,8 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { Users, Wifi, WifiOff, X, Search } from "lucide-react";
+import { usePresence } from "@/hooks/usePresence";
 
 interface ConnectedUsersPanelProps {
   workspaceId: string;
@@ -17,6 +19,9 @@ interface ConnectedUser {
 }
 
 export default function ConnectedUsersPanel({ workspaceId }: ConnectedUsersPanelProps) {
+  // ✅ Mantiene a este usuario marcado como "en línea" mientras el componente esté montado
+  usePresence();
+
   const [isOpen, setIsOpen] = useState(false);
   const [users, setUsers] = useState<ConnectedUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,16 +46,18 @@ export default function ConnectedUsersPanel({ workspaceId }: ConnectedUsersPanel
     };
 
     fetchUsers();
+    // Actualizar cada 30 segundos
     const interval = setInterval(fetchUsers, 30000);
     return () => clearInterval(interval);
   }, [isOpen, workspaceId]);
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = users.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const onlineCount = users.filter(u => u.isOnline).length;
+  const onlineCount = users.filter((u) => u.isOnline).length;
 
   if (!isOpen) {
     return (

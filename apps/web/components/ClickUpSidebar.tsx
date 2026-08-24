@@ -281,46 +281,65 @@ export function ClickUpSidebar({
 
   // ✅ FUNCIÓN BLINDADA PARA CREAR CARPETA DESDE EL SIDEBAR
   const handleCreateFolderInSpace = async (spaceId: string) => {
-    if (!newFolderName.trim()) {
-      setActiveSpaceForFolder(null);
-      return;
-    }
-
-    if (!workspaceId || !spaceId) {
-      alert("❌ Error: Datos incompletos");
-      setActiveSpaceForFolder(null);
-      return;
-    }
-
-    const nameToSubmit = newFolderName.trim();
-    setNewFolderName("");
+  console.log("📁 Creando carpeta en espacio:", spaceId);
+  console.log("📝 Nombre:", newFolderName);
+  console.log("🔑 Workspace ID:", workspaceId);
+  
+  if (!newFolderName.trim()) {
     setActiveSpaceForFolder(null);
+    return;
+  }
 
-    try {
-      const response = await fetch("/api/folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nameToSubmit,
-          spaceId: spaceId,
-          workspaceId: workspaceId,
-        }),
+  if (!workspaceId || !spaceId) {
+    console.error("❌ Faltan datos:", { workspaceId, spaceId });
+    alert("❌ Error: Datos incompletos. Recarga la página.");
+    setActiveSpaceForFolder(null);
+    return;
+  }
+
+  const nameToSubmit = newFolderName.trim();
+  setNewFolderName("");
+  setActiveSpaceForFolder(null);
+
+  try {
+    console.log("📤 Enviando petición a /api/folders...");
+    
+    const response = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nameToSubmit,
+        spaceId: spaceId,
+        workspaceId: workspaceId,
+      }),
+    });
+
+    const data = await response.json();
+    console.log("📥 Respuesta:", response.status, data);
+
+    if (response.ok) {
+      // ✅ AUTO-REFRESH INMEDIATO
+      console.log("✅ Carpeta creada. Actualizando sidebar...");
+      await fetchHierarchy();
+      
+      // ✅ Expandir el espacio automáticamente
+      setExpandedSpaces(prev => {
+        const newSet = new Set(prev);
+        newSet.add(spaceId);
+        console.log("📂 Espacios expandidos:", Array.from(newSet));
+        return newSet;
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        await fetchHierarchy(); // ✅ Se actualiza al instante
-        setExpandedSpaces(prev => new Set(prev).add(spaceId)); // ✅ Se expande para mostrarla
-        alert("✅ Carpeta creada exitosamente");
-      } else {
-        alert(`❌ Error: ${data.error || "No se pudo crear"}`);
-      }
-    } catch (error) {
-      console.error("Error creando carpeta:", error);
-      alert("❌ Error de red");
+      
+      alert("✅ Carpeta creada exitosamente");
+    } else {
+      console.error("❌ Error del servidor:", data);
+      alert(`❌ Error: ${data.error || "No se pudo crear"}`);
     }
-  };
+  } catch (error) {
+    console.error("💥 Error de red:", error);
+    alert("❌ Error de red al crear la carpeta");
+  }
+};
 
   const toggleSpace = (spaceId: string) => {
     const newExpanded = new Set(expandedSpaces);

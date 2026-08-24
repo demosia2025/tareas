@@ -26,15 +26,6 @@
   background: #475569;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
 html, body {
   height: 100%;
   background: #0b0f19;
@@ -48,6 +39,9 @@ html, body {
   flex-direction: column;
 }
 
+/* ==========================================
+   MÓVIL (< 768px) - LAYOUT CORREGIDO
+   ========================================== */
 @media (max-width: 768px) {
   html, body {
     overflow-y: auto !important;
@@ -59,8 +53,27 @@ html, body {
     overflow: visible !important;
   }
 
-  .sidebar-desktop {
-    display: none !important;
+  /* Header compacto y ordenado en móvil */
+  header {
+    min-height: 64px !important;
+    height: auto !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  /* Sidebar como drawer overlay */
+  .sidebar-mobile {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
+    z-index: 50;
+    transition: left 0.3s ease-in-out;
+    background: #0f172a;
+  }
+
+  .sidebar-mobile.open {
+    left: 0;
   }
 
   .sidebar-overlay {
@@ -70,7 +83,7 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);
     z-index: 40;
     backdrop-filter: blur(4px);
   }
@@ -79,61 +92,68 @@ html, body {
     display: block;
   }
 
+  /* Botones táctiles grandes (mínimo 44px) */
   button, a, .clickable {
-    min-height: 48px;
-    min-width: 48px;
-    padding: 12px 16px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px;
   }
 
+  /* Inputs grandes para evitar zoom en iOS */
   input, textarea, select {
     font-size: 16px !important;
     padding: 12px;
   }
 
+  /* Grids a una columna */
   .grid {
     grid-template-columns: 1fr !important;
     gap: 1rem;
   }
 
-  .modal-container,
-  [class*="max-w-"] {
+  /* Modales responsive */
+  .modal-container {
     width: 95% !important;
     max-width: none !important;
     margin: 1rem;
   }
 
-  .table-wrapper {
-    overflow-x: auto;
-    display: block;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* ✅ FIX: Altura mínima en lugar de fija para evitar que se corten los botones */
-  header {
-    min-height: 56px !important;
-    height: auto !important;
-    padding: 0.5rem 0.75rem !important;
-  }
-
-  h1 { font-size: 1.25rem !important; }
-  h2 { font-size: 1.125rem !important; }
+  /* Textos responsive */
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
   h3 { font-size: 1rem !important; }
   
   .text-xs { font-size: 0.75rem !important; }
   .text-sm { font-size: 0.875rem !important; }
+  
+  /* Ocultar elementos no esenciales en móvil */
+  .hidden-mobile {
+    display: none !important;
+  }
 }
 
+/* ==========================================
+   TABLET (768px - 1024px)
+   ========================================== */
 @media (min-width: 769px) and (max-width: 1024px) {
   .sidebar-desktop {
     width: 240px !important;
   }
+  
   .grid-cols-2 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
+/* ==========================================
+   DESKTOP (> 1024px)
+   ========================================== */
 @media (min-width: 1025px) {
   .sidebar-overlay {
     display: none !important;
+  }
+  
+  .hidden-mobile {
+    display: block !important;
   }
 }

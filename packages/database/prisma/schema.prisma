@@ -44,6 +44,9 @@ model User {
   password      String?
   emailVerified DateTime? @map("email_verified")
   image         String?
+  
+  // ✅ CAMPO NUEVO: Para rastrear la última vez que el usuario estuvo activo
+  lastSeen      DateTime  @default(now()) @map("last_seen")
 
   // ROL GLOBAL: superadmin, admin, o user
   role          Role      @default(user)

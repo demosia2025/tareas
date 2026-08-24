@@ -12,15 +12,14 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Guardamos el ID en una constante segura
     const currentUserId = session.user.id;
     const { workspaceid } = await params;
 
     const membership = await prisma.workspaceMember.findFirst({
       where: {
         workspaceId: workspaceid,
-        userId: currentUserId
-      }
+        userId: currentUserId,
+      },
     });
 
     if (!membership) {
@@ -35,26 +34,35 @@ export async function GET(
             id: true,
             name: true,
             email: true,
-            image: true
-          }
-        }
+            image: true,
+            lastSeen: true, // ✅ Ahora incluimos lastSeen
+          },
+        },
       },
       orderBy: {
-        joinedAt: 'asc'
-      }
+        joinedAt: "asc",
+      },
     });
 
-    const users = members.map((m: any) => ({
-      id: m.user.id,
-      name: m.user.name || "Usuario",
-      email: m.user.email,
-      image: m.user.image,
-      role: m.role,
-      isOnline: m.userId === currentUserId,
-      lastSeen: m.userId === currentUserId ? "Ahora" : "Hace 5 min"
-    }));
+    // Calcular quién está en línea (actividad en los últimos 60 segundos)
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
-    // ✅ CORREGIDO: Agregar ': any' a 'a' y 'b' aquí abajo es OBLIGATORIO
+    const users = members.map((m: any) => {
+      const lastSeenDate = m.user.lastSeen || new Date();
+      const isOnline = lastSeenDate > oneMinuteAgo;
+
+      return {
+        id: m.user.id,
+        name: m.user.name || "Usuario",
+        email: m.user.email,
+        image: m.user.image,
+        role: m.role,
+        isOnline: isOnline,
+        lastSeen: isOnline ? "Ahora" : formatLastSeen(lastSeenDate),
+      };
+    });
+
+    // Ordenar: usuarios en línea primero
     users.sort((a: any, b: any) => {
       if (a.isOnline && !b.isOnline) return -1;
       if (!a.isOnline && b.isOnline) return 1;
@@ -66,4 +74,18 @@ export async function GET(
     console.error("Error fetching connected users:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
+}
+
+// Función auxiliar para formatear "última vez visto"
+function formatLastSeen(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) return "Ahora";
+  if (minutes < 60) return `Hace ${minutes} min`;
+  if (hours < 24) return `Hace ${hours} h`;
+  return `Hace ${days} d`;
 }
