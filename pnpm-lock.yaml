@@ -133,9 +133,6 @@ importers:
       '@ai-sdk/groq':
         specifier: ^4.0.30
         version: 4.0.30(zod@3.25.76)
-      '@ai-sdk/mistral':
-        specifier: ^4.0.32
-        version: 4.0.32(zod@3.25.76)
       '@ai-sdk/openai':
         specifier: 0.0.70
         version: 0.0.70(zod@3.25.76)
@@ -301,17 +298,6 @@ packages:
 
   /@ai-sdk/groq@4.0.30(zod@3.25.76):
     resolution: {integrity: sha512-qReVQtws0YCKLRBVaBXX6uD1UUvRTiwYXkEH+h0LpO6BtOhH4Pid/ANclxXGqiHm5J/Cb1XgWg2tQtG2sbsBiw==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.29(zod@3.25.76)
-      zod: 3.25.76
-    dev: false
-
-  /@ai-sdk/mistral@4.0.32(zod@3.25.76):
-    resolution: {integrity: sha512-MK32bK2oDpYuoJyXydhmTrvNG4ojFExdr/a4z7R7vtwtxbDUZEGjg+Z5PQUp1mep7TxQe3COHa5GYFsUdx34uw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
