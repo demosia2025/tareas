@@ -29,7 +29,9 @@ export default function HomePage() {
   const router = useRouter();
   const dashboard = useDashboard();
 
-  // ESTADOS PARA MODALES DE CREACIÓN RÁPIDA
+  // ✅ NUEVO: Clave para forzar la actualización del sidebar cuando se crea algo desde aquí
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
+
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -46,29 +48,23 @@ export default function HomePage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  // ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
-  // REFERENCIAS PARA LOS MENÚS
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
-  // DETECCIÓN SIMPLIFICADA
   const hasWorkspace = dashboard.workspaceId !== null;
 
-  // VERIFICAR LÍMITES
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
-  // REDIRECCIÓN SEGURA DE AUTENTICACIÓN
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
-  // CERRAR MENÚS AL HACER CLIC FUERA
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -80,7 +76,6 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dashboard.isProfileMenuOpen]);
 
-  // OBTENER TAREAS EN PARALELO SIN CONGELAR LA PÁGINA
   useEffect(() => {
     const fetchAllTasks = async () => {
       if (!dashboard.workspaceId || !dashboard.spaces || dashboard.spaces.length === 0) {
@@ -133,7 +128,6 @@ export default function HomePage() {
     fetchAllTasks();
   }, [dashboard.workspaceId, dashboard.spaces]);
 
-  // FUNCIONES DE CREACIÓN
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
@@ -187,6 +181,7 @@ export default function HomePage() {
       });
       if (res.ok) {
         await dashboard.fetchHierarchy();
+        setSidebarRefreshKey(prev => prev + 1); // ✅ Forzar actualización del sidebar
         setIsCreateSpaceModalOpen(false);
         setNewSpaceName("");
       } else {
@@ -226,6 +221,7 @@ export default function HomePage() {
         if (spaceRes.ok) {
           const spaceData = await spaceRes.json();
           await dashboard.fetchHierarchy();
+          setSidebarRefreshKey(prev => prev + 1);
           const firstList = { id: spaceData.id, name: spaceData.name, spaceId: spaceData.id };
           dashboard.handleListSelect(firstList);
           setIsCreateTaskModalOpen(false);
@@ -255,71 +251,67 @@ export default function HomePage() {
     }
   };
 
-  // ✅ FUNCIÓN CORREGIDA: Ahora valida correctamente si hay espacios antes de crear carpeta
   const handleCreateFolder = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!newFolderName.trim()) return;
-  
-  setIsCreatingFolder(true);
-  try {
-    if (!dashboard.workspaceId) {
-      alert("⚠️ Error: No tienes un workspace activo.");
+    e.preventDefault();
+    if (!newFolderName.trim()) return;
+    
+    setIsCreatingFolder(true);
+    try {
+      if (!dashboard.workspaceId) {
+        alert("⚠️ Error: No tienes un workspace activo.");
+        setIsCreatingFolder(false);
+        return;
+      }
+
+      if (!dashboard.spaces || dashboard.spaces.length === 0) {
+        alert("⚠️ Debes crear al menos un Espacio primero.");
+        setIsCreateFolderModalOpen(false);
+        setIsCreatingFolder(false);
+        return;
+      }
+
+      let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
+
+      if (!targetSpaceId) {
+        alert("⚠️ Error: No se pudo identificar un espacio válido.");
+        setIsCreatingFolder(false);
+        return;
+      }
+
+      const res = await fetch("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: newFolderName.trim(), 
+          spaceId: targetSpaceId, 
+          workspaceId: dashboard.workspaceId 
+        })
+      });
+
+      if (res.ok) {
+        await dashboard.fetchHierarchy();
+        setSidebarRefreshKey(prev => prev + 1); // ✅ FIX: Esto hace que el sidebar se actualice al instante
+        
+        setIsCreateFolderModalOpen(false);
+        setNewFolderName("");
+        setSelectedSpaceForFolder("");
+        alert("✅ Carpeta creada exitosamente");
+      } else {
+        const err = await res.json();
+        alert(`❌ Error: ${err.error || "No se pudo crear"}`);
+      }
+    } catch (error) {
+      console.error("Error creando carpeta:", error);
+      alert("❌ Error de conexión");
+    } finally {
       setIsCreatingFolder(false);
-      return;
     }
-
-    if (!dashboard.spaces || dashboard.spaces.length === 0) {
-      alert("⚠️ Debes crear al menos un Espacio primero.");
-      setIsCreateFolderModalOpen(false);
-      setIsCreatingFolder(false);
-      return;
-    }
-
-    let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
-
-    if (!targetSpaceId) {
-      alert("⚠️ Error: No se pudo identificar un espacio válido.");
-      setIsCreatingFolder(false);
-      return;
-    }
-
-    const res = await fetch("/api/folders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        name: newFolderName.trim(), 
-        spaceId: targetSpaceId, 
-        workspaceId: dashboard.workspaceId 
-      })
-    });
-
-    if (res.ok) {
-      // ✅ AUTO-REFRESH INMEDIATO
-      await dashboard.fetchHierarchy();
-      
-      setIsCreateFolderModalOpen(false);
-      setNewFolderName("");
-      setSelectedSpaceForFolder("");
-      
-      // ✅ Notificación visual
-      alert("✅ Carpeta creada exitosamente");
-    } else {
-      const err = await res.json();
-      alert(`❌ Error: ${err.error || "No se pudo crear"}`);
-    }
-  } catch (error) {
-    console.error("Error creando carpeta:", error);
-    alert("❌ Error de conexión");
-  } finally {
-    setIsCreatingFolder(false);
-  }
-};
+  };
 
   const handleCreateTaskFromHome = () => {
     setIsCreateTaskModalOpen(true);
   };
 
-  // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
@@ -328,17 +320,15 @@ export default function HomePage() {
     );
   }
 
-  // EVITA MOSTRAR CONTENIDO SI NO HAY SESIÓN
   if (status === "unauthenticated") {
     return null;
   }
 
   return (
-    // ✅ RESPONSIVE: h-[100dvh] para móviles
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
-      {/* HEADER RESPONSIVE */}
-      <header className="h-14 sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
-        <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
+      {/* ✅ FIX: min-h-14 en lugar de h-14 para que el header crezca si los botones se acomod9n */}
+      <header className="min-h-14 sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
+        <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 py-2">
           <div className="flex items-center gap-2 sm:gap-3">
             <button onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} className="md:hidden p-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors">
               <Menu className="w-5 h-5" />
@@ -363,17 +353,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* ✅ RESPONSIVE: flex-wrap y gap ajustado */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
+            {/* ✅ FIX: Botones Admin siempre visibles, texto más pequeño en móvil */}
             {dashboard.isOwner && (
-              <Link href="/admin2" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-cyan-400 transition-colors shadow-sm">
-                <Shield className="w-3.5 h-3.5" /><span className="hidden sm:inline">Administrador</span>
+              <Link href="/admin2" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-cyan-400 transition-colors shadow-sm whitespace-nowrap">
+                <Shield className="w-3.5 h-3.5" />
+                <span>Administrador</span>
               </Link>
             )}
             
             {dashboard.isSuperAdmin && (
-              <Link href="/admin" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl text-xs font-semibold text-amber-300 transition-colors shadow-sm">
-                <Shield className="w-3.5 h-3.5" /><span className="hidden sm:inline">Super Admin</span>
+              <Link href="/admin" className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl text-[10px] sm:text-xs font-semibold text-amber-300 transition-colors shadow-sm whitespace-nowrap">
+                <Shield className="w-3.5 h-3.5" />
+                <span>Super Admin</span>
               </Link>
             )}
 
@@ -412,7 +404,7 @@ export default function HomePage() {
             {dashboard.workspaceId && (
               <Link
                 href={`/workspace/${dashboard.workspaceId}/users`}
-                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
                 title="Usuarios"
               >
                 <Users className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-cyan-400" />
@@ -457,13 +449,14 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* LAYOUT PRINCIPAL RESPONSIVE */}
       <div className="flex flex-1 overflow-hidden relative">
         {dashboard.isSidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" onClick={() => dashboard.setIsSidebarOpen(false)} />}
         
         <aside className={`absolute md:relative z-30 h-full w-64 sm:w-72 flex-shrink-0 bg-slate-900/90 md:bg-slate-900/40 border-r border-slate-800/80 backdrop-blur-2xl transition-transform duration-300 ease-in-out flex flex-col overflow-hidden ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
           <div className="flex-1 overflow-y-auto">
+            {/* ✅ FIX: Pasamos sidebarRefreshKey para que se actualice cuando se crea algo desde el menú central */}
             <ClickUpSidebar 
+              key={sidebarRefreshKey}
               workspaceId={dashboard.workspaceId || ""} 
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
               onSelectList={dashboard.handleListSelect} 
@@ -477,7 +470,6 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* ✅ RESPONSIVE: overflow-y-auto en móvil */}
         <main className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
           {dashboard.selectedList ? (
             <>
@@ -746,7 +738,6 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
@@ -1051,7 +1042,6 @@ export default function HomePage() {
         />
       )}
 
-      {/* ✅ AGENTE IA FLOTANTE */}
       <AIAssistant />
     </div>
   );

@@ -9,6 +9,7 @@ interface ClickUpSidebarProps {
   onSelectList: (list: { id: string; name: string; spaceId: string; folderId?: string }) => void;
   onOpenFolderModal?: (spaceId: string) => void;
   currentUser?: { id?: string; role?: string };
+  refreshKey?: number; // ✅ NUEVO: Para forzar actualización desde page.tsx
 }
 
 interface Space {
@@ -39,7 +40,8 @@ export function ClickUpSidebar({
   organizationName: propOrgName, 
   onSelectList, 
   onOpenFolderModal,
-  currentUser 
+  currentUser,
+  refreshKey = 0 // ✅ NUEVO
 }: ClickUpSidebarProps) {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [organizationName, setOrganizationName] = useState<string>(propOrgName || "Mi Organización");
@@ -68,6 +70,13 @@ export function ClickUpSidebar({
       fetchHierarchy();
     }
   }, [workspaceId]);
+
+  // ✅ NUEVO: Cuando page.tsx cambia el refreshKey, volvemos a cargar la jerarquía
+  useEffect(() => {
+    if (refreshKey > 0 && workspaceId) {
+      fetchHierarchy();
+    }
+  }, [refreshKey, workspaceId]);
 
   useEffect(() => {
     if (propOrgName) {
@@ -270,7 +279,7 @@ export function ClickUpSidebar({
     }
   };
 
-  // ✅ FUNCIÓN COMPLETA Y CORRECTA PARA CREAR CARPETA DESDE EL SIDEBAR
+  // ✅ FUNCIÓN BLINDADA PARA CREAR CARPETA DESDE EL SIDEBAR
   const handleCreateFolderInSpace = async (spaceId: string) => {
     if (!newFolderName.trim()) {
       setActiveSpaceForFolder(null);
@@ -301,10 +310,8 @@ export function ClickUpSidebar({
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ AUTO-REFRESH INMEDIATO
-        await fetchHierarchy();
-        // ✅ Expandir el espacio automáticamente para mostrar la nueva carpeta
-        setExpandedSpaces(prev => new Set(prev).add(spaceId));
+        await fetchHierarchy(); // ✅ Se actualiza al instante
+        setExpandedSpaces(prev => new Set(prev).add(spaceId)); // ✅ Se expande para mostrarla
         alert("✅ Carpeta creada exitosamente");
       } else {
         alert(`❌ Error: ${data.error || "No se pudo crear"}`);
