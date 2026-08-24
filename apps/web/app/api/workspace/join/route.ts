@@ -1,110 +1,109 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { inviteCode, workspaceSlug, userId } = await request.json();
-
-    if (!inviteCode || !workspaceSlug || !userId) {
-      return NextResponse.json(
-        { error: "Todos los campos son requeridos" },
-        { status: 400 }
-      );
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Buscar por slug normalizado
-    const normalizedSlug = workspaceSlug.toLowerCase().trim().replace(/\s+/g, '-');
-    
-    const workspace = await prisma.workspace.findFirst({
-      where: {
-        OR: [
-          { slug: normalizedSlug },
-          { slug: workspaceSlug } // Por si acaso
-        ]
+    const currentUserId = session.user.id;
+    const body = await req.json();
+    const { inviteCode, workspaceSlug } = body;
+
+    if (!inviteCode || !workspaceSlug) {
+      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    }
+
+    // ✅ CORRECCIÓN 1: Buscar el código en MAYÚSCULAS (case-insensitive)
+    const code = inviteCode.toUpperCase().trim();
+    const slug = workspaceSlug.toLowerCase().trim();
+
+    // Buscar el workspace por slug
+    const workspace = await prisma.workspace.findUnique({
+      where: { slug },
+      include: {
+        inviteCodes: {
+          where: {
+            code: code,
+            active: true,
+          },
+        },
       },
     });
 
     if (!workspace) {
-      return NextResponse.json(
-        { 
-          error: "Workspace no encontrado",
-          debug: { searchedSlug: normalizedSlug, originalSlug: workspaceSlug }
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({ 
+        error: "No se encontró el workspace con ese slug" 
+      }, { status: 404 });
     }
 
-    // Verificar invitación
-    const invite = await prisma.workspaceInvite.findUnique({
-      where: { code: inviteCode },
-    });
-
-    if (!invite || invite.workspaceId !== workspace.id) {
-      return NextResponse.json(
-        { error: "Código de invitación inválido o no corresponde a este workspace" },
-        { status: 400 }
-      );
+    // Verificar que el código de invitación sea válido
+    const inviteCodeRecord = workspace.inviteCodes[0];
+    
+    if (!inviteCodeRecord) {
+      return NextResponse.json({ 
+        error: "El código de invitación no es válido para este workspace" 
+      }, { status: 400 });
     }
 
-    // Verificar que no haya expirado
-    if (invite.expiresAt && invite.expiresAt <= new Date()) {
-      return NextResponse.json(
-        { error: "El código de invitación ha expirado" },
-        { status: 400 }
-      );
+    // Verificar que el código no haya expirado
+    if (inviteCodeRecord.expiresAt && new Date(inviteCodeRecord.expiresAt) < new Date()) {
+      return NextResponse.json({ 
+        error: "El código de invitación ha expirado" 
+      }, { status: 400 });
     }
 
-    // Verificar si el código ya fue utilizado
-    if (invite.usedAt) {
-      return NextResponse.json(
-        { error: "Este código de invitación ya ha sido utilizado" },
-        { status: 400 }
-      );
+    // Verificar que no se haya excedido el límite de usos
+    if (inviteCodeRecord.usedCount >= inviteCodeRecord.maxUses) {
+      return NextResponse.json({ 
+        error: "El código de invitación ha alcanzado su límite de usos" 
+      }, { status: 400 });
     }
 
-    // ✅ CORREGIDO: Usar findFirst para evitar errores de claves compuestas en Prisma
-    const existingMember = await prisma.workspaceMember.findFirst({
+    // Verificar que el usuario no sea ya miembro
+    const existingMembership = await prisma.workspaceMember.findUnique({
       where: {
-        workspaceId: workspace.id,
-        userId,
+        workspaceId_userId: {
+          workspaceId: workspace.id,
+          userId: currentUserId,
+        },
       },
     });
 
-    if (existingMember) {
-      return NextResponse.json(
-        { error: "Ya eres miembro de este workspace" },
-        { status: 400 }
-      );
+    if (existingMembership) {
+      return NextResponse.json({ 
+        error: "Ya eres miembro de este workspace" 
+      }, { status: 400 });
     }
 
-    // Agregar al workspace
+    // ✅ CREAR LA MEMBRESÍA
     await prisma.workspaceMember.create({
       data: {
         workspaceId: workspace.id,
-        userId,
-        role: "member", // ✅ CORREGIDO: minúsculas para coincidir con el enum WorkspaceRole
+        userId: currentUserId,
+        role: "member",
       },
     });
 
-    // ✅ CORREGIDO: WorkspaceInvite no tiene usedCount, usa usedAt y usedBy
-    await prisma.workspaceInvite.update({
-      where: { code: inviteCode },
+    // ✅ ACTUALIZAR EL CONTADOR DE USOS DEL CÓDIGO
+    await prisma.inviteCode.update({
+      where: { id: inviteCodeRecord.id },
       data: {
+        usedCount: { increment: 1 },
+        usedBy: currentUserId,
         usedAt: new Date(),
-        usedBy: userId,
       },
     });
 
-    return NextResponse.json({
-      message: "Te has unido al workspace exitosamente",
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
+    return NextResponse.json({ 
+      success: true, 
+      workspace: { id: workspace.id, name: workspace.name, slug: workspace.slug } 
     });
-  } catch (error: any) {
-    console.error("Error uniéndose al workspace:", error);
-    return NextResponse.json(
-      { error: error.message || "Error al unirse al workspace" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("Error joining workspace:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

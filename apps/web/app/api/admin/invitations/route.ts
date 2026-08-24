@@ -2,91 +2,84 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-export async function GET(request: Request) {
+export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    });
+    const currentUserId = session.user.id;
+    const body = await req.json();
+    const { email, workspaceId, role = "member" } = body;
 
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    if (!email || !workspaceId) {
+      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    const invitations = await prisma.userInvitation.findMany({
-      include: {
-        invitedUser: { select: { name: true, email: true } },
-        workspace: { select: { name: true } },
-        inviter: { select: { name: true } }
+    // Verificar que el usuario actual sea admin/owner del workspace
+    const membership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: currentUserId,
+        },
       },
-      orderBy: { createdAt: "desc" }
     });
 
-    return NextResponse.json(invitations);
-  } catch (error: any) {
-    console.error("Error obteniendo invitaciones:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    });
-
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
+    if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { email, workspaceId, invitationType } = body;
-
-    if (!email || !workspaceId || !invitationType) {
-      return NextResponse.json({ 
-        error: "email, workspaceId e invitationType son requeridos" 
-      }, { status: 400 });
-    }
-
-    const invitedUser = await prisma.user.findUnique({
-      where: { email }
+    // Buscar el usuario por email
+    const targetUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
     });
 
-    if (!invitedUser) {
-      return NextResponse.json({ 
-        error: "Usuario no encontrado con ese email" 
-      }, { status: 404 });
+    if (!targetUser) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const invitation = await prisma.userInvitation.create({
+    // Verificar que no sea ya miembro
+    const existingMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: targetUser.id,
+        },
+      },
+    });
+
+    if (existingMembership) {
+      return NextResponse.json({ error: "El usuario ya es miembro de este workspace" }, { status: 400 });
+    }
+
+    // ✅ CREAR LA MEMBRESÍA DIRECTAMENTE (no solo invitación)
+    await prisma.workspaceMember.create({
       data: {
-        workspace: { connect: { id: workspaceId } },
-        invitedUser: { connect: { id: invitedUser.id } },
-        inviter: { connect: { id: session.user.id } },
-        invitationType,
-        status: "pending"
+        workspaceId,
+        userId: targetUser.id,
+        role: role as any,
       },
-      include: {
-        invitedUser: { select: { name: true, email: true } },
-        workspace: { select: { name: true } },
-        inviter: { select: { name: true } }
-      }
     });
 
-    return NextResponse.json(invitation, { status: 201 });
-  } catch (error: any) {
-    console.error("Error creando invitación:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Opcional: Crear también un registro de invitación para tracking
+    await prisma.userInvitation.create({
+      data: {
+        workspaceId,
+        invitedUserId: targetUser.id,
+        invitationType: "workspace",
+        status: "accepted",
+        invitedBy: currentUserId,
+      },
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      user: { id: targetUser.id, name: targetUser.name, email: targetUser.email } 
+    });
+  } catch (error) {
+    console.error("Error inviting user:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
