@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     const code = inviteCode.toUpperCase().trim();
     const slug = workspaceSlug.toLowerCase().trim();
 
-    // Buscar el workspace por slug
+    // Buscar el workspace por slug e incluir sus códigos de invitación
     const workspace = await prisma.workspace.findUnique({
       where: { slug },
       include: {
@@ -88,13 +88,14 @@ export async function POST(req: Request) {
       },
     });
 
-    // ✅ ACTUALIZAR EL CONTADOR DE USOS DEL CÓDIGO
+    // ✅ CORRECCIÓN 2: Actualizar solo los campos que existen en el modelo InviteCode
+    const newUsedCount = inviteCodeRecord.usedCount + 1;
     await prisma.inviteCode.update({
       where: { id: inviteCodeRecord.id },
       data: {
-        usedCount: { increment: 1 },
-        usedBy: currentUserId,
-        usedAt: new Date(),
+        usedCount: newUsedCount,
+        // Desactivar el código si alcanzó su límite de usos
+        active: newUsedCount < inviteCodeRecord.maxUses,
       },
     });
 
