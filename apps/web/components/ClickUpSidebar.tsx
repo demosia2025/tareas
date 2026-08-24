@@ -7,7 +7,7 @@ interface ClickUpSidebarProps {
   workspaceId: string;
   organizationName?: string;
   onSelectList: (list: { id: string; name: string; spaceId: string; folderId?: string }) => void;
-  onOpenFolderModal?: (spaceId: string) => void; // ✅ AGREGADO: Prop opcional para compatibilidad
+  onOpenFolderModal?: (spaceId: string) => void;
   currentUser?: { id?: string; role?: string };
 }
 
@@ -38,7 +38,7 @@ export function ClickUpSidebar({
   workspaceId, 
   organizationName: propOrgName, 
   onSelectList, 
-  onOpenFolderModal, // ✅ AGREGADO: Se acepta la prop
+  onOpenFolderModal,
   currentUser 
 }: ClickUpSidebarProps) {
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -305,8 +305,15 @@ export function ClickUpSidebar({
     }
   };
 
+  // ✅ MEJORA DEFENSIVA: Validación robusta antes de crear la carpeta
   const handleCreateFolderInSpace = async (spaceId: string) => {
     if (!newFolderName.trim()) {
+      setActiveSpaceForFolder(null);
+      return;
+    }
+
+    if (!workspaceId || !spaceId) {
+      alert("⚠️ Error: Falta el ID del espacio o workspace para crear la carpeta.");
       setActiveSpaceForFolder(null);
       return;
     }
@@ -326,15 +333,17 @@ export function ClickUpSidebar({
         }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         await fetchHierarchy();
         setExpandedSpaces(prev => new Set(prev).add(spaceId));
       } else {
-        const data = await response.json();
-        alert(data.error || "No se pudo crear la carpeta");
+        alert(`❌ No se pudo crear la carpeta: ${data.error || "Error desconocido"}`);
       }
     } catch (error) {
       console.error("Error creando carpeta:", error);
+      alert("❌ Error de red al crear la carpeta.");
     }
   };
 
@@ -409,7 +418,6 @@ export function ClickUpSidebar({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      // ✅ Si existe onOpenFolderModal, lo usamos; si no, usamos el flujo interno
                       if (onOpenFolderModal) {
                         onOpenFolderModal(space.id);
                       } else {
@@ -714,7 +722,7 @@ export function ClickUpSidebar({
 
       {showCreateSpace && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl modal-container">
             <h3 className="text-base font-bold text-white mb-4">Crear Nuevo Espacio</h3>
             <form onSubmit={handleCreateSpace}>
               <div className="mb-4">

@@ -17,9 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="dark">
-      <body className={`${inter.className} bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col antialiased`}>
+      <body className={`${inter.className} bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col antialiased overflow-x-hidden`}>
         <Providers>
-          <main className="flex-1 flex flex-col">
+          <main className="flex-1 flex flex-col w-full overflow-y-auto">
             {children}
           </main>
         </Providers>

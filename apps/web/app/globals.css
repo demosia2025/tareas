@@ -8,18 +8,6 @@
   box-sizing: border-box;
 }
 
-html, body {
-  height: 100%;
-  overflow: hidden;
-  background: #020617;
-  color: #f1f5f9;
-}
-
-#__next {
-  height: 100%;
-  overflow: hidden;
-}
-
 /* Scrollbar personalizado */
 ::-webkit-scrollbar {
   width: 6px;
@@ -39,7 +27,6 @@ html, body {
   background: #475569;
 }
 
-/* Ocultar scrollbar en elementos específicos */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -47,4 +34,68 @@ html, body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ==========================================
+   BASE RESPONSIVA (Mobile First)
+   ========================================== */
+html, body {
+  height: 100%;
+  background: #0b0f19;
+  color: #f1f5f9;
+  /* Permitir scroll vertical en móvil, evitar horizontal */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#__next {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================
+   AJUSTES ESPECÍFICOS PARA MÓVIL (< 768px)
+   ========================================== */
+@media (max-width: 768px) {
+  /* Forzar que los contenedores principales permitan scroll */
+  .main-container, .content-area {
+    overflow-y: auto !important;
+    height: auto !important;
+  }
+
+  /* Sidebar como drawer en móvil */
+  .sidebar-desktop {
+    display: none;
+  }
+  
+  /* Botones y áreas táctiles más grandes */
+  button, a, .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Inputs más grandes para evitar zoom en iOS */
+  input, textarea, select {
+    font-size: 16px !important;
+    padding: 0.75rem;
+  }
+
+  /* Modales a pantalla casi completa en móvil */
+  .modal-container {
+    width: 95% !important;
+    max-width: none !important;
+    margin: 1rem;
+  }
+
+  /* Grids a una sola columna */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tablas con scroll horizontal */
+  .table-wrapper {
+    overflow-x: auto;
+    display: block;
+  }
 }
