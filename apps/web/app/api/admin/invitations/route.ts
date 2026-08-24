@@ -2,6 +2,63 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+// ✅ GET: Listar todas las invitaciones del sistema
+export async function GET() {
+  try {
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    // Verificar que el usuario sea superadmin
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    }
+
+    // Obtener todas las invitaciones con sus relaciones
+    const invitations = await prisma.userInvitation.findMany({
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        inviter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        invitedUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return NextResponse.json({ invitations });
+  } catch (error) {
+    console.error("Error fetching invitations:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+// ✅ POST: Crear una nueva invitación
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -64,7 +121,7 @@ export async function POST(req: Request) {
     });
 
     // Opcional: Crear también un registro de invitación para tracking
-    await prisma.userInvitation.create({
+    const invitation = await prisma.userInvitation.create({
       data: {
         workspaceId,
         invitedUserId: targetUser.id,
@@ -76,7 +133,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      user: { id: targetUser.id, name: targetUser.name, email: targetUser.email } 
+      user: { id: targetUser.id, name: targetUser.name, email: targetUser.email },
+      invitation: { id: invitation.id, status: invitation.status }
     });
   } catch (error) {
     console.error("Error inviting user:", error);

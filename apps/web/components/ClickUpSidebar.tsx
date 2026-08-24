@@ -280,7 +280,7 @@ export function ClickUpSidebar({
     }
 
     if (!workspaceId || !spaceId) {
-      alert("❌ Error: Datos incompletos. Workspace ID: " + workspaceId + ", Space ID: " + spaceId);
+      alert("❌ Error: Datos incompletos");
       setActiveSpaceForFolder(null);
       return;
     }
