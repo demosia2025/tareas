@@ -201,26 +201,19 @@ export function ClickUpSidebar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newSpaceName, workspaceId: workspaceId }),
       });
+      
       if (spaceResponse.ok) {
         const createdSpace = await spaceResponse.json();
-        const listResponse = await fetch("/api/lists", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "General", spaceId: createdSpace.id, workspaceId: workspaceId }),
-        });
-        if (listResponse.ok) {
-          const createdList = await listResponse.json();
-          onSelectList({ id: createdList.id, name: createdList.name, spaceId: createdSpace.id });
-        }
         await fetchHierarchy();
         setNewSpaceName("");
         setShowCreateSpace(false);
+        setExpandedSpaces(prev => new Set(prev).add(createdSpace.id));
       } else {
         const errData = await spaceResponse.json().catch(() => ({}));
         alert(errData.error || "No se pudo crear el espacio.");
       }
     } catch (error) {
-      console.error("Error creando space y lista inicial:", error);
+      console.error("Error creando el espacio:", error);
     }
   };
 
@@ -378,7 +371,6 @@ export function ClickUpSidebar({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Forzamos el estado local del input de carpeta (ignorando el onOpenFolderModal externo que impedía su visualización)
                       setActiveSpaceForFolder(space.id);
                       setActiveSpaceForList(null);
                       setNewFolderName("");
@@ -618,7 +610,7 @@ export function ClickUpSidebar({
                               </span>
                               <span 
                                 onClick={(e) => handleDeleteList(list.id, e)}
-                                className="p-1 hover:text-rose-400 text-slate-400 transition-colors cursor-pointer"
+                                className="p-1 hover:text-rose-400 text-slate-400 cursor-pointer"
                                 title="Eliminar lista"
                               >
                                 <Trash2 className="w-3 h-3" />
