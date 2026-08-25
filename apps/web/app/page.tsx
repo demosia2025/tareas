@@ -1,3 +1,4 @@
+// apps/web/app/page.tsx
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
@@ -415,7 +416,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* ✅ CAMBIO CLAVE: Link a página de usuarios en lugar de modal */}
+            {/* ✅ CAMBIO CLAVE: Link a página de usuarios (NO ConnectedUsersPanel) */}
             {dashboard.workspaceId && (
               <Link 
                 href={`/workspace/${dashboard.workspaceId}/users`}
