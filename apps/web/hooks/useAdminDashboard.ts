@@ -47,28 +47,47 @@ export function useAdminDashboard() {
         fetch("/api/admin/organizations"),
         fetch("/api/admin/users"),
         fetch("/api/admin2/invite-codes"),
-        fetch("/api/admin/invitations").catch(() => ({ ok: false, json: () => Promise.resolve([]) })),
-        fetch("/api/admin/organizations/plan").catch(() => ({ ok: false }))
+        fetch("/api/admin/invitations").catch(() => ({ ok: false, json: () => Promise.resolve({}) })),
+        fetch("/api/admin/organizations/plan").catch(() => ({ ok: false, json: () => Promise.resolve(null) } as unknown as Response))
       ]);
 
       if (statsRes.ok) setStats(await statsRes.json());
+      
       if (wsRes.ok) {
         const wsData = await wsRes.json();
-        setWorkspaces(wsData);
-        setWorkspaceStats(wsData);
+        const wsArray = Array.isArray(wsData) ? wsData : (wsData.workspaces || []);
+        setWorkspaces(wsArray);
+        setWorkspaceStats(wsArray);
       }
-      if (spRes.ok) setSpaces(await spRes.json());
+      
+      if (spRes.ok) {
+        const spData = await spRes.json();
+        setSpaces(Array.isArray(spData) ? spData : (spData.spaces || []));
+      }
+      
       if (orgRes.ok) {
         const orgData = await orgRes.json();
-        setOrganizations(orgData);
-        setOrgStats(orgData);
+        const orgArray = Array.isArray(orgData) ? orgData : (orgData.organizations || []);
+        setOrganizations(orgArray);
+        setOrgStats(orgArray);
       }
-      if (uRes.ok) setUsers(await uRes.json());
       
-      // ✅ CORREGIDO: Agregado 'as any' para evitar el error de tipo en TypeScript
-      if (icRes.ok) setInviteCodes(await (icRes as any).json());
-      if (invRes.ok) setInvitations(await (invRes as any).json());
-      if (planRes.ok) setPlanInfo(await (planRes as any).json());
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        setUsers(Array.isArray(uData) ? uData : (uData.users || []));
+      }
+      
+      if (icRes.ok) {
+        const icData = await icRes.json();
+        setInviteCodes(Array.isArray(icData) ? icData : (icData.inviteCodes || icData.codes || []));
+      }
+      
+      if (invRes.ok) {
+        const invData = await invRes.json();
+        setInvitations(Array.isArray(invData) ? invData : (invData.invitations || []));
+      }
+      
+      if (planRes.ok) setPlanInfo(await planRes.json());
       
     } catch (error) {
       console.error("Error fetching admin data:", error);
@@ -154,12 +173,35 @@ export function useAdminDashboard() {
     }
   };
 
-  const filteredWorkspaces = useMemo(() => workspaces.filter(w => w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) || w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())), [workspaces, searchWorkspaces]);
-  const filteredSpaces = useMemo(() => spaces.filter(s => s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) || s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())), [spaces, searchSpaces]);
-  const filteredOrgs = useMemo(() => organizations.filter(o => o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) || o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())), [organizations, searchOrgs]);
-  const filteredUsers = useMemo(() => users.filter(u => u.name?.toLowerCase().includes(searchUsers.toLowerCase()) || u.email?.toLowerCase().includes(searchUsers.toLowerCase())), [users, searchUsers]);
-  const filteredInvitations = useMemo(() => invitations.filter(i => i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) || i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())), [invitations, searchInvitations]);
-  const filteredCodes = useMemo(() => inviteCodes.filter(c => c.code?.toLowerCase().includes(searchCodes.toLowerCase()) || c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())), [inviteCodes, searchCodes]);
+  const filteredWorkspaces = useMemo(() => 
+    (Array.isArray(workspaces) ? workspaces : []).filter(w => w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) || w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())), 
+    [workspaces, searchWorkspaces]
+  );
+  
+  const filteredSpaces = useMemo(() => 
+    (Array.isArray(spaces) ? spaces : []).filter(s => s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) || s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())), 
+    [spaces, searchSpaces]
+  );
+  
+  const filteredOrgs = useMemo(() => 
+    (Array.isArray(organizations) ? organizations : []).filter(o => o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) || o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())), 
+    [organizations, searchOrgs]
+  );
+  
+  const filteredUsers = useMemo(() => 
+    (Array.isArray(users) ? users : []).filter(u => u.name?.toLowerCase().includes(searchUsers.toLowerCase()) || u.email?.toLowerCase().includes(searchUsers.toLowerCase())), 
+    [users, searchUsers]
+  );
+  
+  const filteredInvitations = useMemo(() => 
+    (Array.isArray(invitations) ? invitations : []).filter(i => i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) || i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())), 
+    [invitations, searchInvitations]
+  );
+  
+  const filteredCodes = useMemo(() => 
+    (Array.isArray(inviteCodes) ? inviteCodes : []).filter(c => c.code?.toLowerCase().includes(searchCodes.toLowerCase()) || c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())), 
+    [inviteCodes, searchCodes]
+  );
 
   return {
     isLoading, isAdmin, stats, activeTab, setActiveTab,

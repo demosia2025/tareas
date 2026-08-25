@@ -2,12 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ✅ CRÍTICO: Prevenir overflow horizontal en TODA la app */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  width: 100%;
+  background: #0b0f19;
+  color: #f1f5f9;
+}
+
+#__next {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Scrollbar personalizado */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -26,123 +46,99 @@
   background: #475569;
 }
 
-html, body {
-  height: 100%;
-  background: #0b0f19;
-  color: #f1f5f9;
-  overflow-x: hidden;
-}
-
-#__next {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
 /* ==========================================
-   MÓVIL (< 768px) - LAYOUT FLUIDO Y SEGURO
+   MÓVIL (< 768px) - CORRECCIONES CRÍTICAS
    ========================================== */
 @media (max-width: 768px) {
-  html, body {
-    overflow-y: auto !important;
-    height: auto !important;
+  /* Forzar que nada se salga de la pantalla */
+  html, body, #__next {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
   }
 
-  #__next {
+  /* Header compacto en móvil */
+  header {
+    min-height: 48px !important;
     height: auto !important;
+    padding: 0.5rem 0.75rem !important;
     overflow: visible !important;
   }
 
-  /* Header compacto y ordenado en móvil */
-  header {
-    min-height: 60px !important;
+  /* Botones más pequeños en móvil */
+  header button, header a, header [class*="px-"] {
+    min-height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+
+  /* Iconos más pequeños */
+  header svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  /* Sidebar como drawer */
+  aside {
+    width: 260px !important;
+  }
+
+  /* Main content con scroll */
+  main {
+    overflow-y: auto !important;
     height: auto !important;
-    padding: 0.5rem 0.75rem !important;
+    min-height: calc(100vh - 48px) !important;
   }
 
-  /* Sidebar como drawer overlay */
-  .sidebar-mobile {
-    position: fixed;
-    top: 0;
-    left: -100%;
-    width: 280px;
-    height: 100vh;
-    z-index: 50;
-    transition: left 0.3s ease-in-out;
-    background: #0f172a;
-  }
-
-  .sidebar-mobile.open {
-    left: 0;
-  }
-
-  .sidebar-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    z-index: 40;
-    backdrop-filter: blur(4px);
-  }
-
-  .sidebar-overlay.show {
-    display: block;
-  }
-
-  /* Inputs seguros para evitar zoom automático en iOS */
-  input, textarea, select {
-    font-size: 16px !important;
-  }
-
-  /* Ajuste inteligente de áreas táctiles solo en elementos principales */
-  button:not(.icon-btn), .btn-touch {
-    min-height: 40px;
-  }
-
-  /* Forzar grillas responsivas automáticas */
+  /* Grids a una columna */
   .grid {
     grid-template-columns: 1fr !important;
     gap: 0.75rem;
   }
 
-  /* Modales adaptados al ancho de pantalla móvil */
+  /* Modales responsive */
+  [class*="fixed inset"],
   .modal-container {
-    width: 92% !important;
+    width: 95% !important;
     max-width: none !important;
-    margin: auto;
-    max-height: 85vh;
-    overflow-y: auto;
+    margin: 0.5rem;
   }
 
-  /* Control de desbordamiento en tablas móviles */
-  .table-container {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* ==========================================
-   TABLET (768px - 1024px)
-   ========================================== */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .sidebar-desktop {
-    width: 240px !important;
-  }
+  /* Textos más pequeños */
+  h1 { font-size: 1.125rem !important; }
+  h2 { font-size: 1rem !important; }
+  h3 { font-size: 0.875rem !important; }
   
-  .grid-cols-2-tablet {
-    grid-template-columns: repeat(2, 1fr) !important;
+  /* Inputs grandes para iOS */
+  input, textarea, select {
+    font-size: 16px !important;
+    padding: 10px;
   }
 }
 
-/* ==========================================
-   DESKTOP (> 1024px)
-   ========================================== */
-@media (min-width: 1025px) {
-  .sidebar-overlay {
-    display: none !important;
+/* MÓVIL PEQUEÑO (< 480px) */
+@media (max-width: 480px) {
+  header {
+    min-height: 44px !important;
+    padding: 0.5rem !important;
+  }
+
+  header button, header a {
+    min-height: 28px !important;
+    padding: 4px 6px !important;
+    font-size: 9px !important;
+  }
+
+  header svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
+
+/* DESKTOP (> 768px) */
+@media (min-width: 769px) {
+  main {
+    overflow-y: auto;
+    height: calc(100vh - 64px);
   }
 }

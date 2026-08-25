@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+// GET: Obtiene la lista de usuarios del workspace ordenados por conexión
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ workspaceid: string }> }
@@ -16,10 +17,7 @@ export async function GET(
     const { workspaceid } = await params;
 
     const membership = await prisma.workspaceMember.findFirst({
-      where: {
-        workspaceId: workspaceid,
-        userId: currentUserId,
-      },
+      where: { workspaceId: workspaceid, userId: currentUserId },
     });
 
     if (!membership) {
@@ -35,38 +33,44 @@ export async function GET(
             name: true,
             email: true,
             image: true,
-            lastSeen: true, // ✅ Ahora incluimos lastSeen
+            lastSeen: true,
           },
         },
       },
-      orderBy: {
-        joinedAt: "asc",
-      },
+      orderBy: { joinedAt: "asc" },
     });
 
-    // Calcular quién está en línea (actividad en los últimos 60 segundos)
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
-    const users = members.map((m: any) => {
-      const lastSeenDate = m.user.lastSeen || new Date();
-      const isOnline = lastSeenDate > oneMinuteAgo;
+    const users = members
+      .filter((m: any) => m.user.id !== currentUserId) // Opcional: excluirte a ti mismo de la lista
+      .map((m: any) => {
+        const lastSeenDate = m.user.lastSeen ? new Date(m.user.lastSeen) : new Date(0);
+        const isOnline = lastSeenDate > oneMinuteAgo;
 
-      return {
-        id: m.user.id,
-        name: m.user.name || "Usuario",
-        email: m.user.email,
-        image: m.user.image,
-        role: m.role,
-        isOnline: isOnline,
-        lastSeen: isOnline ? "Ahora" : formatLastSeen(lastSeenDate),
-      };
-    });
+        return {
+          id: m.user.id,
+          name: m.user.name || "Usuario",
+          email: m.user.email,
+          avatar: m.user.image,
+          role: m.role,
+          isOnline: isOnline,
+          lastSeen: m.user.lastSeen,
+        };
+      });
 
-    // Ordenar: usuarios en línea primero
+    // Ordenar: conectados primero, luego alfabéticamente
     users.sort((a: any, b: any) => {
-      if (a.isOnline && !b.isOnline) return -1;
-      if (!a.isOnline && b.isOnline) return 1;
-      return 0;
+      const ahora = Date.now();
+      const umbralActividad = 60 * 1000;
+      
+      const aConectado = a.lastSeen && (ahora - new Date(a.lastSeen).getTime() < umbralActividad);
+      const bConectado = b.lastSeen && (ahora - new Date(b.lastSeen).getTime() < umbralActividad);
+
+      if (aConectado && !bConectado) return -1;
+      if (!aConectado && bConectado) return 1;
+
+      return (a.name || "").localeCompare(b.name || "");
     });
 
     return NextResponse.json({ users });
@@ -76,16 +80,33 @@ export async function GET(
   }
 }
 
-// Función auxiliar para formatear "última vez visto"
-function formatLastSeen(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - new Date(date).getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+// POST: Envía un mensaje a cualquier usuario (conectado o desconectado)
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ workspaceid: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-  if (minutes < 1) return "Ahora";
-  if (minutes < 60) return `Hace ${minutes} min`;
-  if (hours < 24) return `Hace ${hours} h`;
-  return `Hace ${days} d`;
+    const { receiverId, content } = await req.json();
+    if (!receiverId || !content?.trim()) {
+      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        content: content.trim(),
+        senderId: session.user.id,
+        receiverId,
+      },
+    });
+
+    return NextResponse.json(message);
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return NextResponse.json({ error: "Error al enviar mensaje" }, { status: 500 });
+  }
 }

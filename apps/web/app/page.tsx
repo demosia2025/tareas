@@ -29,10 +29,7 @@ export default function HomePage() {
   const router = useRouter();
   const dashboard = useDashboard();
 
-  // ✅ CLAVE PARA FORZAR LA ACTUALIZACIÓN DEL SIDEBAR CUANDO SE CREA ALGO DESDE AQUÍ
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
-
-  // ESTADOS PARA MODALES DE CREACIÓN RÁPIDA
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
@@ -49,29 +46,23 @@ export default function HomePage() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  // ESTADO PARA TODAS LAS TAREAS DEL WORKSPACE
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
-  // REFERENCIAS PARA LOS MENÚS
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
-  // DETECCIÓN SIMPLIFICADA
   const hasWorkspace = dashboard.workspaceId !== null;
 
-  // VERIFICAR LÍMITES
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
-  // REDIRECCIÓN SEGURA DE AUTENTICACIÓN
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
   }, [status, router]);
 
-  // CERRAR MENÚS AL HACER CLIC FUERA
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -83,7 +74,6 @@ export default function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dashboard.isProfileMenuOpen]);
 
-  // OBTENER TAREAS EN PARALELO SIN CONGELAR LA PÁGINA
   useEffect(() => {
     const fetchAllTasks = async () => {
       if (!dashboard.workspaceId || !dashboard.spaces || dashboard.spaces.length === 0) {
@@ -136,7 +126,6 @@ export default function HomePage() {
     fetchAllTasks();
   }, [dashboard.workspaceId, dashboard.spaces]);
 
-  // FUNCIONES DE CREACIÓN
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorkspaceName.trim()) return;
@@ -190,7 +179,7 @@ export default function HomePage() {
       });
       if (res.ok) {
         await dashboard.fetchHierarchy();
-        setSidebarRefreshKey(prev => prev + 1); // ✅ Forzar actualización del sidebar
+        setSidebarRefreshKey(prev => prev + 1);
         setIsCreateSpaceModalOpen(false);
         setNewSpaceName("");
       } else {
@@ -298,9 +287,8 @@ export default function HomePage() {
       });
 
       if (res.ok) {
-        // ✅ AUTO-REFRESH INMEDIATO
         await dashboard.fetchHierarchy();
-        setSidebarRefreshKey(prev => prev + 1); // ✅ Fuerza al sidebar a recargarse y mostrar la carpeta
+        setSidebarRefreshKey(prev => prev + 1);
         
         setIsCreateFolderModalOpen(false);
         setNewFolderName("");
@@ -322,7 +310,6 @@ export default function HomePage() {
     setIsCreateTaskModalOpen(true);
   };
 
-  // PANTALLA DE CARGA
   if (status === "loading" || dashboard.loading) {
     return (
       <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
@@ -331,7 +318,6 @@ export default function HomePage() {
     );
   }
 
-  // EVITA MOSTRAR CONTENIDO SI NO HAY SESIÓN
   if (status === "unauthenticated") {
     return null;
   }
@@ -339,17 +325,16 @@ export default function HomePage() {
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
       
-      {/* ✅ HEADER RESPONSIVE CORREGIDO: min-h-[64px] y flex-wrap para evitar superposiciones */}
-      <header className="min-h-[64px] sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
-        <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 py-2">
+      {/* ✅ HEADER RESPONSIVE CORREGIDO */}
+      <header className="min-h-[48px] sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] overflow-visible">
+        <div className="h-full px-2 sm:px-6 flex items-center justify-between gap-1 sm:gap-4 py-1 flex-wrap">
           
-          {/* Lado izquierdo: Menú hamburguesa + Logo */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             <button 
               onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
-              className="md:hidden p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="md:hidden p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4" />
             </button>
             
             <div 
@@ -357,45 +342,48 @@ export default function HomePage() {
                 if (dashboard.selectedList) dashboard.setSelectedList(null);
                 router.push("/");
               }} 
-              className="flex items-center gap-2 sm:gap-2.5 group cursor-pointer" 
-              title="Ir al inicio"
+              className="flex items-center gap-1 sm:gap-2.5 group cursor-pointer flex-shrink-0"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/25 group-hover:scale-105 transition-transform">
-                <Zap className="w-4 h-4 text-white fill-white/20" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
               </div>
-              <div className="hidden sm:flex items-center space-x-2 sm:space-x-3 bg-slate-900/80 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm group-hover:bg-slate-800/80 transition-colors">
-                <span className="text-sm font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
+              <div className="hidden sm:flex items-center bg-slate-900/80 px-2 sm:px-3 py-1 rounded-lg border border-slate-800">
+                <span className="text-xs sm:text-sm font-bold text-cyan-400">
                   Gestion de tareas
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Lado derecho: Botones organizados con flex-wrap */}
-          <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
-            {/* Botones Admin - Texto corto en móvil para evitar desbordamiento */}
-            {dashboard.isOwner && (
+          <div className="flex items-center gap-0.5 sm:gap-3 flex-wrap justify-end flex-shrink-0">
+            
+            {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
               <Link 
                 href="/admin2" 
-                className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-cyan-400 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
+                className="flex items-center justify-center px-1.5 sm:px-2 py-1 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-[9px] sm:text-xs font-semibold text-cyan-400 min-h-[28px] sm:min-h-[32px]"
+                title="Administrador"
               >
                 <Shield className="w-3.5 h-3.5 hidden sm:block" />
-                <span>Admin</span>
+                <span className="hidden sm:inline">Admin</span>
+                <span className="sm:hidden">A</span>
               </Link>
             )}
             
-            {dashboard.isSuperAdmin && (
+            {(session?.user as any)?.role === 'superadmin' && (
               <Link 
                 href="/admin" 
-                className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 hover:border-amber-400 rounded-xl text-[10px] sm:text-xs font-semibold text-amber-300 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
+                className="flex items-center justify-center px-1.5 sm:px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-[9px] sm:text-xs font-semibold text-amber-400 min-h-[28px] sm:min-h-[32px]"
+                title="Super Admin"
               >
                 <Shield className="w-3.5 h-3.5 hidden sm:block" />
-                <span>Super</span>
+                <span className="hidden sm:inline">Super</span>
+                <span className="sm:hidden">S</span>
               </Link>
             )}
 
+            {/* ✅ SELECTOR DE WORKSPACES - SIEMPRE VISIBLE */}
             {dashboard.memberships && dashboard.memberships.length > 0 && (
-              <div ref={workspaceMenuRef} className="max-w-[100px] sm:max-w-none">
+              <div ref={workspaceMenuRef} className="max-w-[120px] sm:max-w-[200px]">
                 <WorkspaceSelector
                   memberships={dashboard.memberships}
                   currentWorkspaceId={dashboard.workspaceId || ""}
@@ -427,47 +415,37 @@ export default function HomePage() {
             )}
 
             {dashboard.workspaceId && (
-              <Link
-                href={`/workspace/${dashboard.workspaceId}/users`}
-                className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-[10px] sm:text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap min-h-[36px]"
-                title="Usuarios"
-              >
-                <Users className="w-4 h-4 text-cyan-400" />
-                <span className="hidden sm:inline">Usuarios</span>
-              </Link>
+              <ConnectedUsersPanel workspaceId={dashboard.workspaceId} />
             )}
             
             <div className="relative" ref={profileMenuRef}>
               <button 
                 onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} 
-                className="flex items-center gap-1.5 px-1.5 py-1 sm:px-2.5 sm:py-1 rounded-xl hover:bg-slate-800/60 transition-all border border-slate-800/80 hover:border-slate-700/60 shadow-inner min-h-[36px]"
+                className="flex items-center gap-1 px-1 py-0.5 rounded-lg hover:bg-slate-800/60 transition-all border border-slate-800 min-h-[28px] sm:min-h-[32px]"
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-cyan-500/20">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-[10px]">
                   {(session?.user?.name || "U")[0].toUpperCase()}
                 </div>
-                <div className="text-left hidden lg:block">
-                  <div className="text-[11px] font-bold text-white leading-tight">{session?.user?.name || "Usuario"}</div>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+                <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
               </button>
               
               {dashboard.isProfileMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => dashboard.setIsProfileMenuOpen(false)}></div>
-                  <div className="absolute right-0 mt-2 w-52 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 z-[9999] backdrop-blur-2xl animate-in fade-in zoom-in-95">
-                    <div className="px-3.5 py-2 border-b border-slate-800">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 z-[9999]">
+                    <div className="px-3 py-2 border-b border-slate-800">
                       <p className="text-xs font-bold text-white truncate">{session?.user?.name}</p>
                       <p className="text-[10px] text-slate-400 truncate">{session?.user?.email}</p>
                     </div>
-                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); router.push('/profile'); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors">
-                      <User className="w-4 h-4 text-slate-400" /><span>Mi Perfil</span>
+                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); router.push('/profile'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">
+                      <User className="w-3.5 h-3.5" /><span>Perfil</span>
                     </button>
-                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsJoinModalOpen(true); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-200 transition-colors">
-                      <Building2 className="w-4 h-4" /><span>Unirme a Workspace</span>
+                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsJoinModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10">
+                      <Building2 className="w-3.5 h-3.5" /><span>Unirme a Workspace</span>
                     </button>
                     <div className="h-px bg-slate-800 my-1" />
-                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsLogoutModalOpen(true); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition-colors font-medium">
-                      <LogOut className="w-4 h-4" /><span>Cerrar Sesión</span>
+                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsLogoutModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10">
+                      <LogOut className="w-3.5 h-3.5" /><span>Salir</span>
                     </button>
                   </div>
                 </>
@@ -477,9 +455,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ✅ LAYOUT PRINCIPAL RESPONSIVE CON SIDEBAR DRAWER */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Overlay oscuro para cerrar sidebar en móvil */}
         {dashboard.isSidebarOpen && (
           <div 
             className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" 
@@ -487,7 +463,6 @@ export default function HomePage() {
           />
         )}
         
-        {/* Sidebar: Drawer en móvil, fijo en desktop */}
         <aside 
           className={`
             absolute md:relative z-30 h-full w-64 sm:w-72 flex-shrink-0 
@@ -499,7 +474,6 @@ export default function HomePage() {
           `}
         >
           <div className="flex-1 overflow-y-auto">
-            {/* ✅ CLAVE DE ACTUALIZACIÓN: Fuerza al sidebar a recargarse cuando se crea algo desde el menú central */}
             <ClickUpSidebar 
               key={sidebarRefreshKey}
               workspaceId={dashboard.workspaceId || ""} 
@@ -515,7 +489,6 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* Contenido principal con scroll independiente */}
         <main className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
           {dashboard.selectedList ? (
             <>
@@ -784,7 +757,6 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* MODALES */}
       <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
@@ -987,84 +959,81 @@ export default function HomePage() {
       )}
 
       {dashboard.isJoinModalOpen && (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between p-5 border-b border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
-            <Building2 className="w-4 h-4 text-white" />
-          </div>
-          <h3 className="text-base font-bold text-white">Unirme a Workspace</h3>
-        </div>
-        <button 
-          onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }} 
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
+                  <Building2 className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-base font-bold text-white">Unirme a Workspace</h3>
+              </div>
+              <button 
+                onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }} 
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-      {/* Error */}
-      {dashboard.joinError && (
-        <div className="mx-5 mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs font-medium text-rose-300 leading-relaxed">{dashboard.joinError}</p>
+            {dashboard.joinError && (
+              <div className="mx-5 mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-rose-300 leading-relaxed">{dashboard.joinError}</p>
+              </div>
+            )}
+
+            <form onSubmit={dashboard.handleJoinWorkspace} className="p-5 space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Código de Invitación
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dashboard.joinForm.inviteCode}
+                  onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })}
+                  placeholder="ABC123"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Ingresa el código de 6 caracteres</p>
+              </div>
+              
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Slug del Workspace
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={dashboard.joinForm.workspaceSlug}
+                  onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, workspaceSlug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                  placeholder="mi-workspace"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Pídele este dato al administrador</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }}
+                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={dashboard.isJoining}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+                >
+                  {dashboard.isJoining ? "Uniéndote..." : "Unirme al Workspace"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
-
-      {/* Form */}
-      <form onSubmit={dashboard.handleJoinWorkspace} className="p-5 space-y-4">
-        <div>
-          <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-            Código de Invitación
-          </label>
-          <input
-            type="text"
-            required
-            value={dashboard.joinForm.inviteCode}
-            onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })}
-            placeholder="ABC123"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-          />
-          <p className="text-[10px] text-slate-500 mt-1">Ingresa el código de 6 caracteres</p>
-        </div>
-        
-        <div>
-          <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-            Slug del Workspace
-          </label>
-          <input
-            type="text"
-            required
-            value={dashboard.joinForm.workspaceSlug}
-            onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, workspaceSlug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-            placeholder="mi-workspace"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-          />
-          <p className="text-[10px] text-slate-500 mt-1">Pídele este dato al administrador</p>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }}
-            className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={dashboard.isJoining}
-            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50"
-          >
-            {dashboard.isJoining ? "Uniéndote..." : "Unirme al Workspace"}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
 
       {dashboard.isLogoutModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
@@ -1105,7 +1074,6 @@ export default function HomePage() {
         />
       )}
 
-      {/* AGENTE IA FLOTANTE */}
       <AIAssistant />
     </div>
   );

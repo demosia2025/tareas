@@ -6,7 +6,7 @@ import { Providers } from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Project SaaS Kanban",
+  title: "Gestion de tareas",
   description: "Gestiona tus tareas con estilo",
 };
 

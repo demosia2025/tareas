@@ -69,6 +69,10 @@ model User {
   // ✅ RELACIONES PARA USER INVITATION
   sentInvitations     UserInvitation[] @relation("Inviter")
   receivedInvitations UserInvitation[] @relation("InvitedUser")
+
+  // ✅ RELACIONES NUEVAS PARA MENSAJES DIRECTOS (Chat de usuarios conectados/desconectados)
+  sentMessages        Message[]        @relation("SentMessages")
+  receivedMessages    Message[]        @relation("ReceivedMessages")
   
   @@map("users")
 }
@@ -410,6 +414,23 @@ model ChatMessage {
   
   @@index([chatRoomId, createdAt])
   @@map("chat_messages")
+}
+
+// ==================== DIRECT MESSAGE (MENSAJES DIRECTOS / RECADOS) ====================
+model Message {
+  id         String   @id @default(cuid())
+  content    String   @db.Text
+  senderId   String   @map("sender_id") @db.Uuid
+  receiverId String   @map("receiver_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  read       Boolean  @default(false)
+
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
 }
 
 // ==================== ACTIVITY ====================
