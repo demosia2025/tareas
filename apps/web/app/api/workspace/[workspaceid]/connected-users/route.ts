@@ -1,4 +1,3 @@
-// apps/web/app/api/workspace/[workspaceid]/connected-users/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -10,34 +9,37 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user?.id) {
+      console.log("❌ No hay sesión o user.id");
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    const currentUserId = session.user.id;
     const { workspaceid } = await params;
 
+    console.log(" Buscando membresía para:", { workspaceid, currentUserId });
+
     const membership = await prisma.workspaceMember.findFirst({
-      where: { workspaceId: workspaceid, userId: session.user.id },
+      where: { workspaceId: workspaceid, userId: currentUserId },
     });
 
     if (!membership) {
+      console.log("❌ Usuario no es miembro del workspace");
       return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
     }
+
+    console.log("✅ Usuario es miembro. Buscando todos los miembros...");
 
     const members = await prisma.workspaceMember.findMany({
       where: { workspaceId: workspaceid },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            lastSeen: true,
-          },
+          select: { id: true, name: true, email: true, image: true, lastSeen: true },
         },
       },
       orderBy: { joinedAt: "asc" },
     });
+
+    console.log(" Miembros encontrados:", members.length);
 
     // Considera "online" si lastSeen es menor a 2 minutos
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
@@ -64,9 +66,10 @@ export async function GET(
       return 0;
     });
 
+    console.log("✅ Usuarios procesados:", users.length);
     return NextResponse.json({ users });
   } catch (error) {
-    console.error("Error fetching connected users:", error);
+    console.error("❌ Error en connected-users API:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

@@ -8,13 +8,11 @@ export function usePresence() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Solo ejecutar si la sesión está autenticada y el usuario existe
     if (status !== "authenticated" || !session?.user?.id) return;
 
     const updatePresence = async () => {
       try {
-        // ✅ CORREGIDO: No enviamos el userId en el body. 
-        // La API ya lo obtiene de forma segura desde el servidor con auth()
+        // ✅ No enviamos body, la API obtiene el ID de la sesión
         await fetch("/api/user/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -24,13 +22,9 @@ export function usePresence() {
       }
     };
 
-    // Actualizar inmediatamente
     updatePresence();
-    
-    // Actualizar cada 30 segundos
     intervalRef.current = setInterval(updatePresence, 30000);
 
-    // Actualizar al cerrar la pestaña
     const handleBeforeUnload = () => updatePresence();
     window.addEventListener("beforeunload", handleBeforeUnload);
 

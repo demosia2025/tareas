@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
@@ -8,7 +8,7 @@ import {
   Zap, Menu, Shield, User, LogOut, ChevronDown, LayoutDashboard,
   List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal, 
   Layers, Sparkles, RefreshCw, Plus, Building2, AlertTriangle, Users,
-  FolderPlus, FolderKanban, CheckSquare, Clock, ArrowRight, FileText, Folder
+  FolderKanban, CheckSquare, Clock, ArrowRight, Folder
 } from "lucide-react";
 
 import { useDashboard } from "@/hooks/useDashboard";
@@ -20,9 +20,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { InlineTaskRow } from "@/components/InlineTaskRow";
 import { FunctionalCalendarView } from "@/components/FunctionalCalendarView";
 import AIAssistant from "@/components/AIAssistant";
-
 import WorkspaceSelector from "@/components/WorkspaceSelector";
-import ConnectedUsersPanel from "@/components/ConnectedUsersPanel";
 import PlanLimitModal from "@/components/PlanLimitModal";
 
 export default function HomePage() {
@@ -265,7 +263,7 @@ export default function HomePage() {
       }
 
       if (!dashboard.spaces || dashboard.spaces.length === 0) {
-        alert("⚠️ Debes crear al menos un Espacio primero.");
+        alert("️ Debes crear al menos un Espacio primero.");
         setIsCreateFolderModalOpen(false);
         setIsCreatingFolder(false);
         return;
@@ -299,7 +297,7 @@ export default function HomePage() {
         alert("✅ Carpeta creada exitosamente");
       } else {
         const err = await res.json();
-        alert(`❌ Error: ${err.error || "No se pudo crear"}`);
+        alert(` Error: ${err.error || "No se pudo crear"}`);
       }
     } catch (error) {
       console.error("Error creando carpeta:", error);
@@ -328,11 +326,11 @@ export default function HomePage() {
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
       
-      {/* HEADER CORREGIDO CON FLEX-WRAP Y ORDENAMIENTO RESPONSIVO */}
+      {/* HEADER */}
       <header className="h-auto min-h-[56px] bg-slate-900/85 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] px-3 py-2">
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
           
-          {/* Lado izquierdo: Botón menú lateral y Logo */}
+          {/* Lado izquierdo */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button 
               onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
@@ -359,7 +357,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Lado derecho: Accesos rápidos, Selector, Usuarios y Perfil adaptados */}
+          {/* Lado derecho */}
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
             
             {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
@@ -417,11 +415,16 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Panel de usuarios conectados (Visible ahora también de forma compacta en pantallas medianas) */}
+            {/* ✅ CAMBIO CLAVE: Link a página de usuarios en lugar de modal */}
             {dashboard.workspaceId && (
-              <div className="flex items-center">
-                <ConnectedUsersPanel workspaceId={dashboard.workspaceId} />
-              </div>
+              <Link 
+                href={`/workspace/${dashboard.workspaceId}/users`}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
+                title="Ver usuarios"
+              >
+                <Users className="w-4 h-4 text-cyan-400" />
+                <span className="hidden sm:inline">Usuarios</span>
+              </Link>
             )}
             
             {/* Menú de Perfil */}
@@ -779,30 +782,11 @@ export default function HomePage() {
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">Nombre del Workspace</label>
-                <input
-                  type="text"
-                  required
-                  value={newWorkspaceName}
-                  onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  placeholder="Mi nuevo workspace"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50"
-                />
+                <input type="text" required value={newWorkspaceName} onChange={(e) => setNewWorkspaceName(e.target.value)} placeholder="Mi nuevo workspace" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500/50" />
               </div>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setIsCreateWorkspaceModalOpen(false); setNewWorkspaceName(""); }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingWorkspace}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50"
-                >
-                  {isCreatingWorkspace ? "Creando..." : "Crear Workspace"}
-                </button>
+                <button type="button" onClick={() => { setIsCreateWorkspaceModalOpen(false); setNewWorkspaceName(""); }} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">Cancelar</button>
+                <button type="submit" disabled={isCreatingWorkspace} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50">{isCreatingWorkspace ? "Creando..." : "Crear Workspace"}</button>
               </div>
             </form>
           </div>
@@ -814,37 +798,16 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">Crear Nuevo Espacio</h3>
-              <button onClick={() => { setIsCreateSpaceModalOpen(false); setNewSpaceName(""); }} className="p-1 text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => { setIsCreateSpaceModalOpen(false); setNewSpaceName(""); }} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreateSpace} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">Nombre del Espacio</label>
-                <input
-                  type="text"
-                  required
-                  value={newSpaceName}
-                  onChange={(e) => setNewSpaceName(e.target.value)}
-                  placeholder="Mi nuevo espacio"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500/50"
-                />
+                <input type="text" required value={newSpaceName} onChange={(e) => setNewSpaceName(e.target.value)} placeholder="Mi nuevo espacio" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500/50" />
               </div>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setIsCreateSpaceModalOpen(false); setNewSpaceName(""); }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingSpace}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50"
-                >
-                  {isCreatingSpace ? "Creando..." : "Crear Espacio"}
-                </button>
+                <button type="button" onClick={() => { setIsCreateSpaceModalOpen(false); setNewSpaceName(""); }} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">Cancelar</button>
+                <button type="submit" disabled={isCreatingSpace} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50">{isCreatingSpace ? "Creando..." : "Crear Espacio"}</button>
               </div>
             </form>
           </div>
@@ -856,23 +819,15 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">Crear Nueva Tarea</h3>
-              <button onClick={() => { setIsCreateTaskModalOpen(false); setSelectedSpaceForTask(""); }} className="p-1 text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => { setIsCreateTaskModalOpen(false); setSelectedSpaceForTask(""); }} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreateTask} className="space-y-4">
               {dashboard.spaces && dashboard.spaces.length > 0 ? (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">Seleccionar Espacio</label>
-                  <select
-                    value={selectedSpaceForTask}
-                    onChange={(e) => setSelectedSpaceForTask(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500/50"
-                  >
+                  <select value={selectedSpaceForTask} onChange={(e) => setSelectedSpaceForTask(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500/50">
                     <option value="">Selecciona un espacio...</option>
-                    {dashboard.spaces.map((space) => (
-                      <option key={space.id} value={space.id}>{space.name}</option>
-                    ))}
+                    {dashboard.spaces.map((space) => (<option key={space.id} value={space.id}>{space.name}</option>))}
                   </select>
                 </div>
               ) : (
@@ -881,20 +836,8 @@ export default function HomePage() {
                 </div>
               )}
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setIsCreateTaskModalOpen(false); setSelectedSpaceForTask(""); }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingTask}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50"
-                >
-                  {isCreatingTask ? "Creando..." : "Crear Tarea"}
-                </button>
+                <button type="button" onClick={() => { setIsCreateTaskModalOpen(false); setSelectedSpaceForTask(""); }} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors">Cancelar</button>
+                <button type="submit" disabled={isCreatingTask} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50">{isCreatingTask ? "Creando..." : "Crear Tarea"}</button>
               </div>
             </form>
           </div>
@@ -906,23 +849,15 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">Crear Nueva Carpeta</h3>
-              <button onClick={() => { setIsCreateFolderModalOpen(false); setNewFolderName(""); setSelectedSpaceForFolder(""); }} className="p-1 text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => { setIsCreateFolderModalOpen(false); setNewFolderName(""); setSelectedSpaceForFolder(""); }} className="p-1 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreateFolder} className="space-y-4">
               {dashboard.spaces && dashboard.spaces.length > 0 ? (
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">Seleccionar Espacio</label>
-                  <select
-                    value={selectedSpaceForFolder}
-                    onChange={(e) => setSelectedSpaceForFolder(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500/50"
-                  >
+                  <select value={selectedSpaceForFolder} onChange={(e) => setSelectedSpaceForFolder(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500/50">
                     <option value="">Selecciona un espacio...</option>
-                    {dashboard.spaces.map((space) => (
-                      <option key={space.id} value={space.id}>{space.name}</option>
-                    ))}
+                    {dashboard.spaces.map((space) => (<option key={space.id} value={space.id}>{space.name}</option>))}
                   </select>
                 </div>
               ) : (
@@ -933,32 +868,11 @@ export default function HomePage() {
               )}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">Nombre de la Carpeta</label>
-                <input
-                  type="text"
-                  required
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Mi nueva carpeta"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500/50"
-                  disabled={!dashboard.spaces || dashboard.spaces.length === 0}
-                />
+                <input type="text" required value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Mi nueva carpeta" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500/50" disabled={!dashboard.spaces || dashboard.spaces.length === 0} />
               </div>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setIsCreateFolderModalOpen(false); setNewFolderName(""); setSelectedSpaceForFolder(""); }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
-                  disabled={!dashboard.spaces || dashboard.spaces.length === 0}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingFolder || !dashboard.spaces || dashboard.spaces.length === 0}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCreatingFolder ? "Creando..." : "Crear Carpeta"}
-                </button>
+                <button type="button" onClick={() => { setIsCreateFolderModalOpen(false); setNewFolderName(""); setSelectedSpaceForFolder(""); }} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors" disabled={!dashboard.spaces || dashboard.spaces.length === 0}>Cancelar</button>
+                <button type="submit" disabled={isCreatingFolder || !dashboard.spaces || dashboard.spaces.length === 0} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed">{isCreatingFolder ? "Creando..." : "Crear Carpeta"}</button>
               </div>
             </form>
           </div>
@@ -970,72 +884,31 @@ export default function HomePage() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
-                  <Building2 className="w-4 h-4 text-white" />
-                </div>
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20"><Building2 className="w-4 h-4 text-white" /></div>
                 <h3 className="text-base font-bold text-white">Unirme a Workspace</h3>
               </div>
-              <button 
-                onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }} 
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
             </div>
-
             {dashboard.joinError && (
               <div className="mx-5 mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs font-medium text-rose-300 leading-relaxed">{dashboard.joinError}</p>
               </div>
             )}
-
             <form onSubmit={dashboard.handleJoinWorkspace} className="p-5 space-y-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Código de Invitación
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={dashboard.joinForm.inviteCode}
-                  onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })}
-                  placeholder="ABC123"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-                />
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Código de Invitación</label>
+                <input type="text" required value={dashboard.joinForm.inviteCode} onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })} placeholder="ABC123" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all" />
                 <p className="text-[10px] text-slate-500 mt-1">Ingresa el código de 6 caracteres</p>
               </div>
-              
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Slug del Workspace
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={dashboard.joinForm.workspaceSlug}
-                  onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, workspaceSlug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
-                  placeholder="mi-workspace"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-                />
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Slug del Workspace</label>
+                <input type="text" required value={dashboard.joinForm.workspaceSlug} onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, workspaceSlug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} placeholder="mi-workspace" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all" />
                 <p className="text-[10px] text-slate-500 mt-1">Pídele este dato al administrador</p>
               </div>
-
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={dashboard.isJoining}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50"
-                >
-                  {dashboard.isJoining ? "Uniéndote..." : "Unirme al Workspace"}
-                </button>
+                <button type="button" onClick={() => { dashboard.setIsJoinModalOpen(false); dashboard.setJoinError(""); }} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700">Cancelar</button>
+                <button type="submit" disabled={dashboard.isJoining} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50">{dashboard.isJoining ? "Uniéndote..." : "Unirme al Workspace"}</button>
               </div>
             </form>
           </div>
@@ -1046,24 +919,12 @@ export default function HomePage() {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
-                <AlertTriangle className="w-6 h-6 text-rose-400" />
-              </div>
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4"><AlertTriangle className="w-6 h-6 text-rose-400" /></div>
               <h3 className="text-lg font-bold text-white mb-2">¿Cerrar sesión?</h3>
               <p className="text-sm text-slate-400 mb-6">Estás a punto de cerrar tu sesión actual. ¿Deseas continuar?</p>
               <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => dashboard.setIsLogoutModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-500/20"
-                >
-                  Sí, cerrar sesión
-                </button>
+                <button onClick={() => dashboard.setIsLogoutModalOpen(false)} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors border border-slate-700">Cancelar</button>
+                <button onClick={() => signOut({ callbackUrl: "/login" })} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-500/20">Sí, cerrar sesión</button>
               </div>
             </div>
           </div>

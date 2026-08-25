@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ✅ CRÍTICO: Prevenir overflow horizontal en TODA la app */
+/* ==========================================
+   RESET Y BASE
+   ========================================== */
 * {
   margin: 0;
   padding: 0;
@@ -12,6 +14,7 @@
 html {
   overflow-x: hidden;
   width: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -19,6 +22,7 @@ body {
   width: 100%;
   background: #0b0f19;
   color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 #__next {
@@ -27,7 +31,9 @@ body {
   overflow-x: hidden;
 }
 
-/* Scrollbar personalizado */
+/* ==========================================
+   SCROLLBAR PERSONALIZADO
+   ========================================== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -47,98 +53,152 @@ body {
 }
 
 /* ==========================================
-   MÓVIL (< 768px) - CORRECCIONES CRÍTICAS
+   INPUTS - Prevenir zoom en iOS
    ========================================== */
-@media (max-width: 768px) {
+input, textarea, select {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  input, textarea, select {
+    font-size: inherit;
+  }
+}
+
+/* ==========================================
+   HEADER RESPONSIVO
+   ========================================== */
+header {
+  min-height: 56px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  header {
+    min-height: 64px;
+  }
+}
+
+/* ==========================================
+   SIDEBAR RESPONSIVO
+   ========================================== */
+aside {
+  width: 260px;
+}
+
+@media (min-width: 640px) {
+  aside {
+    width: 280px;
+  }
+}
+
+/* ==========================================
+   MAIN CONTENT
+   ========================================== */
+main {
+  min-width: 0;
+  flex: 1;
+}
+
+/* ==========================================
+   MÓVIL (< 768px)
+   ========================================== */
+@media (max-width: 767px) {
   /* Forzar que nada se salga de la pantalla */
   html, body, #__next {
-    overflow-x: hidden !important;
-    width: 100% !important;
-    max-width: 100vw !important;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
-  /* Header compacto en móvil */
+  /* Header compacto */
   header {
-    min-height: 48px !important;
-    height: auto !important;
-    padding: 0.5rem 0.75rem !important;
-    overflow: visible !important;
+    min-height: 48px;
+    padding: 0.5rem 0.75rem;
   }
 
-  /* Botones más pequeños en móvil */
-  header button, header a, header [class*="px-"] {
-    min-height: 32px !important;
-    padding: 4px 8px !important;
-    font-size: 10px !important;
-  }
-
-  /* Iconos más pequeños */
-  header svg {
-    width: 16px !important;
-    height: 16px !important;
+  /* Botones del header más pequeños */
+  header button, header a {
+    min-height: 32px;
   }
 
   /* Sidebar como drawer */
   aside {
-    width: 260px !important;
+    width: 260px;
   }
 
   /* Main content con scroll */
   main {
-    overflow-y: auto !important;
-    height: auto !important;
-    min-height: calc(100vh - 48px) !important;
+    overflow-y: auto;
+    height: auto;
+    min-height: calc(100vh - 48px);
   }
 
   /* Grids a una columna */
   .grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 
   /* Modales responsive */
-  [class*="fixed inset"],
-  .modal-container {
-    width: 95% !important;
-    max-width: none !important;
+  .modal-container,
+  [class*="fixed inset"] > div {
+    width: 95%;
+    max-width: none;
     margin: 0.5rem;
   }
 
   /* Textos más pequeños */
-  h1 { font-size: 1.125rem !important; }
-  h2 { font-size: 1rem !important; }
-  h3 { font-size: 0.875rem !important; }
-  
-  /* Inputs grandes para iOS */
-  input, textarea, select {
-    font-size: 16px !important;
-    padding: 10px;
-  }
+  h1 { font-size: 1.125rem; }
+  h2 { font-size: 1rem; }
+  h3 { font-size: 0.875rem; }
 }
 
-/* MÓVIL PEQUEÑO (< 480px) */
-@media (max-width: 480px) {
+/* ==========================================
+   MÓVIL PEQUEÑO (< 480px)
+   ========================================== */
+@media (max-width: 479px) {
   header {
-    min-height: 44px !important;
-    padding: 0.5rem !important;
+    min-height: 44px;
+    padding: 0.5rem;
   }
 
   header button, header a {
-    min-height: 28px !important;
-    padding: 4px 6px !important;
-    font-size: 9px !important;
-  }
-
-  header svg {
-    width: 14px !important;
-    height: 14px !important;
+    min-height: 28px;
   }
 }
 
-/* DESKTOP (> 768px) */
-@media (min-width: 769px) {
+/* ==========================================
+   DESKTOP (> 768px)
+   ========================================== */
+@media (min-width: 768px) {
   main {
     overflow-y: auto;
     height: calc(100vh - 64px);
   }
+}
+
+/* ==========================================
+   UTILIDADES RESPONSIVAS
+   ========================================== */
+/* Prevenir desbordamiento de imágenes */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Prevenir desbordamiento de texto largo */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Asegurar que los elementos flex no se desborden */
+.flex {
+  min-width: 0;
+}
+
+.flex-1 {
+  min-width: 0;
 }

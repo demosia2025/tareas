@@ -1,4 +1,3 @@
-// apps/web/app/api/user/presence/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -6,18 +5,14 @@ import { auth } from "@/auth";
 export async function POST(req: Request) {
   try {
     const session = await auth();
+    
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { userId } = await req.json();
-    if (userId !== session.user.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-    }
-
-    // Actualiza lastSeen en la tabla User
+    // ✅ CORREGIDO: Usamos el ID de la sesión, no del body
     await prisma.user.update({
-      where: { id: userId },
+      where: { id: session.user.id },
       data: { lastSeen: new Date() },
     });
 
