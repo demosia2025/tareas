@@ -1,17 +1,15 @@
 // apps/web/app/page.tsx
 "use client";
-
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import {
   Zap, Menu, Shield, User, LogOut, ChevronDown, LayoutDashboard,
-  List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal, 
+  List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal,
   Layers, Sparkles, RefreshCw, Plus, Building2, AlertTriangle, Users,
   FolderKanban, CheckSquare, Clock, ArrowRight, Folder
 } from "lucide-react";
-
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePresence } from "@/hooks/usePresence";
 import { ClickUpSidebar } from "@/components/ClickUpSidebar";
@@ -37,18 +35,15 @@ export default function HomePage() {
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
-  
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [newSpaceName, setNewSpaceName] = useState("");
   const [selectedSpaceForTask, setSelectedSpaceForTask] = useState<string>("");
   const [selectedSpaceForFolder, setSelectedSpaceForFolder] = useState<string>("");
   const [newFolderName, setNewFolderName] = useState("");
-  
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
@@ -57,7 +52,7 @@ export default function HomePage() {
 
   const hasWorkspace = dashboard.workspaceId !== null;
 
-  const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
+  const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity ||
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
   useEffect(() => {
@@ -255,7 +250,6 @@ export default function HomePage() {
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
-    
     setIsCreatingFolder(true);
     try {
       if (!dashboard.workspaceId) {
@@ -263,36 +257,30 @@ export default function HomePage() {
         setIsCreatingFolder(false);
         return;
       }
-
       if (!dashboard.spaces || dashboard.spaces.length === 0) {
         alert("⚠️ Debes crear al menos un Espacio primero.");
         setIsCreateFolderModalOpen(false);
         setIsCreatingFolder(false);
         return;
       }
-
       let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
-
       if (!targetSpaceId) {
         alert("⚠️ Error: No se pudo identificar un espacio válido.");
         setIsCreatingFolder(false);
         return;
       }
-
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          name: newFolderName.trim(), 
-          spaceId: targetSpaceId, 
-          workspaceId: dashboard.workspaceId 
+        body: JSON.stringify({
+          name: newFolderName.trim(),
+          spaceId: targetSpaceId,
+          workspaceId: dashboard.workspaceId
         })
       });
-
       if (res.ok) {
         await dashboard.fetchHierarchy();
         setSidebarRefreshKey(prev => prev + 1);
-        
         setIsCreateFolderModalOpen(false);
         setNewFolderName("");
         setSelectedSpaceForFolder("");
@@ -327,25 +315,22 @@ export default function HomePage() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
-      
       {/* HEADER */}
       <header className="h-auto min-h-[56px] bg-slate-900/85 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] px-3 py-2">
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
-          
           {/* Lado izquierdo */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button 
-              onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
+            <button
+              onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)}
               className="md:hidden p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors flex items-center justify-center"
             >
               <Menu className="w-5 h-5" />
             </button>
-            
-            <div 
+            <div
               onClick={() => {
                 if (dashboard.selectedList) dashboard.setSelectedList(null);
                 router.push("/");
-              }} 
+              }}
               className="flex items-center gap-2 group cursor-pointer"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
@@ -361,10 +346,9 @@ export default function HomePage() {
 
           {/* Lado derecho */}
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
-            
             {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
-              <Link 
-                href="/admin2" 
+              <Link
+                href="/admin2"
                 className="flex items-center justify-center px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-xs font-semibold text-cyan-400 gap-1.5"
                 title="Administrador"
               >
@@ -372,10 +356,9 @@ export default function HomePage() {
                 <span className="hidden sm:inline">Admin</span>
               </Link>
             )}
-            
             {(session?.user as any)?.role === 'superadmin' && (
-              <Link 
-                href="/admin" 
+              <Link
+                href="/admin"
                 className="flex items-center justify-center px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-semibold text-amber-400 gap-1.5"
                 title="Super Admin"
               >
@@ -419,7 +402,7 @@ export default function HomePage() {
 
             {/* ✅ ENLACE A PÁGINA DE USUARIOS (NO MODAL FLOTANTE) */}
             {dashboard.workspaceId && (
-              <Link 
+              <Link
                 href={`/workspace/${dashboard.workspaceId}/users`}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
                 title="Ver usuarios"
@@ -428,11 +411,11 @@ export default function HomePage() {
                 <span className="hidden sm:inline">Usuarios</span>
               </Link>
             )}
-            
+
             {/* Menú de Perfil */}
             <div className="relative" ref={profileMenuRef}>
-              <button 
-                onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} 
+              <button
+                onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)}
                 className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800/60 transition-all border border-slate-800"
               >
                 <div className="w-7 h-7 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -440,7 +423,6 @@ export default function HomePage() {
                 </div>
                 <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
               </button>
-              
               {dashboard.isProfileMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => dashboard.setIsProfileMenuOpen(false)}></div>
@@ -469,29 +451,28 @@ export default function HomePage() {
 
       <div className="flex flex-1 overflow-hidden relative">
         {dashboard.isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" 
-            onClick={() => dashboard.setIsSidebarOpen(false)} 
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity"
+            onClick={() => dashboard.setIsSidebarOpen(false)}
           />
         )}
-        
-        <aside 
+        <aside
           className={`
-            absolute md:relative z-30 h-full w-72 flex-shrink-0 
-            bg-slate-900/95 md:bg-slate-900/40 
-            border-r border-slate-800/80 backdrop-blur-2xl 
-            transition-transform duration-300 ease-in-out 
+            absolute md:relative z-30 h-full w-72 flex-shrink-0
+            bg-slate-900/95 md:bg-slate-900/40
+            border-r border-slate-800/80 backdrop-blur-2xl
+            transition-transform duration-300 ease-in-out
             flex flex-col overflow-hidden
             ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           `}
         >
           <div className="flex-1 overflow-y-auto">
-            <ClickUpSidebar 
+            <ClickUpSidebar
               key={sidebarRefreshKey}
-              workspaceId={dashboard.workspaceId || ""} 
+              workspaceId={dashboard.workspaceId || ""}
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
-              onSelectList={dashboard.handleListSelect} 
-              onOpenFolderModal={dashboard.handleOpenFolderModal} 
+              onSelectList={dashboard.handleListSelect}
+              onOpenFolderModal={dashboard.handleOpenFolderModal}
             />
           </div>
           <div className="p-3 pt-2 flex-shrink-0 border-t border-slate-800/60 bg-slate-950/20">
@@ -534,7 +515,6 @@ export default function HomePage() {
                     </button>
                   </div>
                 </div>
-                
                 <div className="mt-3 pt-3 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 relative z-10">
                   <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
                     <div className="relative flex-1 max-w-sm">
@@ -592,7 +572,6 @@ export default function HomePage() {
                   <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">¿Qué quieres hacer hoy?</h1>
                   <p className="text-xs text-slate-400">Elige una opción para continuar</p>
                 </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
                   <div className="space-y-4 lg:border-r lg:border-slate-800/60 lg:pr-8">
                     <div className="flex items-center gap-2.5">
@@ -604,7 +583,6 @@ export default function HomePage() {
                         <p className="text-[10px] text-slate-400 mt-0.5">Tus tareas más recientes</p>
                       </div>
                     </div>
-
                     {isLoadingAllTasks ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-400 border-t-transparent"></div>
@@ -635,19 +613,11 @@ export default function HomePage() {
                                   </p>
                                 )}
                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                    task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                    task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                    'bg-slate-700/50 text-slate-400 border border-slate-700'
-                                  }`}>
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-slate-700/50 text-slate-400 border border-slate-700'}`}>
                                     {task.status === 'done' ? 'Completada' : task.status === 'in_progress' ? 'En progreso' : 'Por hacer'}
                                   </span>
                                   {task.priority && task.priority > 0 && (
-                                    <span className={`text-[10px] font-medium ${
-                                      task.priority >= 4 ? 'text-rose-400' :
-                                      task.priority >= 3 ? 'text-orange-400' :
-                                      'text-slate-400'
-                                    }`}>
+                                    <span className={`text-[10px] font-medium ${task.priority >= 4 ? 'text-rose-400' : task.priority >= 3 ? 'text-orange-400' : 'text-slate-400'}`}>
                                       {task.priority >= 4 ? '🔥 Urgente' : task.priority >= 3 ? ' Alta' : 'Normal'}
                                     </span>
                                   )}
@@ -662,7 +632,6 @@ export default function HomePage() {
                         ))}
                       </div>
                     )}
-
                     {!isLoadingAllTasks && allRecentTasks.length === 0 && (
                       <div className="text-center py-12">
                         <CheckSquare className="w-10 h-10 text-slate-700 mx-auto mb-3" />
@@ -671,7 +640,6 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
-
                   <div className="space-y-4">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center">
@@ -682,7 +650,6 @@ export default function HomePage() {
                         <p className="text-[10px] text-slate-400 mt-0.5">Empieza algo nuevo</p>
                       </div>
                     </div>
-
                     <div className="space-y-2.5">
                       <button
                         onClick={() => {
@@ -709,7 +676,6 @@ export default function HomePage() {
                         </div>
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
                       </button>
-
                       <button
                         onClick={() => setIsCreateSpaceModalOpen(true)}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
@@ -723,7 +689,6 @@ export default function HomePage() {
                         </div>
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
                       </button>
-
                       <button
                         onClick={() => setIsCreateFolderModalOpen(true)}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
@@ -737,7 +702,6 @@ export default function HomePage() {
                         </div>
                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
                       </button>
-
                       <button
                         onClick={handleCreateTaskFromHome}
                         className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
