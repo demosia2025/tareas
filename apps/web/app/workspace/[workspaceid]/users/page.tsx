@@ -1,10 +1,9 @@
-// apps/web/app/workspace/[workspaceid]/users/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Users, Wifi, WifiOff, Search, ArrowLeft, MessageCircle, RefreshCw, LayoutGrid, List } from "lucide-react";
+import { Users, Wifi, WifiOff, Search, ArrowLeft, MessageCircle, RefreshCw, LayoutGrid, List, X } from "lucide-react";
 import Link from "next/link";
 
 interface ConnectedUser {
@@ -38,16 +37,13 @@ export default function WorkspaceUsersPage() {
       try {
         setLoading(true);
         setError("");
-        
         const res = await fetch(`/api/workspace/${workspaceId}/connected-users`, {
           cache: 'no-store'
         });
-        
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || `Error ${res.status}: No se pudieron cargar los usuarios`);
         }
-        
         const data = await res.json();
         setUsers(data.users || []);
       } catch (err: any) {
@@ -77,7 +73,6 @@ export default function WorkspaceUsersPage() {
   return (
     <>
       <div className="min-h-screen bg-slate-950 text-slate-100">
-        {/* Header */}
         <header className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -92,8 +87,6 @@ export default function WorkspaceUsersPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Toggle de vista */}
               <div className="flex items-center gap-2 bg-slate-800/60 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode("grid")}
@@ -122,9 +115,7 @@ export default function WorkspaceUsersPage() {
           </div>
         </header>
 
-        {/* Contenido principal */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Barra de búsqueda */}
           <div className="mb-6">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -138,7 +129,6 @@ export default function WorkspaceUsersPage() {
             </div>
           </div>
 
-          {/* Lista de usuarios */}
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-cyan-500 border-t-transparent" />
@@ -168,7 +158,6 @@ export default function WorkspaceUsersPage() {
               </p>
             </div>
           ) : viewMode === "grid" ? (
-            /* VISTA DE CUADRÍCULA */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredUsers.map((user) => (
                 <div
@@ -224,7 +213,6 @@ export default function WorkspaceUsersPage() {
               ))}
             </div>
           ) : (
-            /* VISTA DE LISTA */
             <div className="space-y-2">
               {filteredUsers.map((user) => (
                 <div
@@ -285,7 +273,6 @@ export default function WorkspaceUsersPage() {
         </main>
       </div>
 
-      {/* MODAL DE CHAT */}
       {chatWith && (
         <DirectMessageModal
           user={chatWith}
@@ -297,7 +284,6 @@ export default function WorkspaceUsersPage() {
   );
 }
 
-// Componente del Modal de Chat
 function DirectMessageModal({
   user,
   workspaceId,
@@ -310,15 +296,11 @@ function DirectMessageModal({
   const { data: session } = useSession();
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [user.id]);
-
+  if (!user) return;  // ✅ CORRECTO: user sí existe como prop
+  
   const fetchMessages = async () => {
     try {
       const res = await fetch(
@@ -332,6 +314,11 @@ function DirectMessageModal({
       console.error("Error fetching messages:", error);
     }
   };
+
+  fetchMessages();
+  const interval = setInterval(fetchMessages, 3000);
+  return () => clearInterval(interval);
+}, [user.id, workspaceId]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,7 +338,14 @@ function DirectMessageModal({
 
       if (res.ok) {
         setNewMessage("");
-        await fetchMessages();
+        // Refrescar inmediatamente después de enviar
+        const res2 = await fetch(
+          `/api/messages?otherUserId=${user.id}&workspaceId=${workspaceId}`
+        );
+        if (res2.ok) {
+          const data = await res2.json();
+          setMessages(data.messages || []);
+        }
       } else {
         alert("Error al enviar mensaje");
       }
@@ -447,5 +441,3 @@ function DirectMessageModal({
     </div>
   );
 }
-
-import { X } from "lucide-react";
