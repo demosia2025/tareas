@@ -29,6 +29,7 @@ export default function HomePage() {
   const router = useRouter();
   const dashboard = useDashboard();
 
+  // ✅ PRESENCIA GLOBAL: Mantiene al usuario "en línea" mientras está en el dashboard
   usePresence();
 
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
@@ -264,7 +265,7 @@ export default function HomePage() {
       }
 
       if (!dashboard.spaces || dashboard.spaces.length === 0) {
-        alert("️ Debes crear al menos un Espacio primero.");
+        alert("⚠️ Debes crear al menos un Espacio primero.");
         setIsCreateFolderModalOpen(false);
         setIsCreatingFolder(false);
         return;
@@ -298,7 +299,7 @@ export default function HomePage() {
         alert("✅ Carpeta creada exitosamente");
       } else {
         const err = await res.json();
-        alert(` Error: ${err.error || "No se pudo crear"}`);
+        alert(`❌ Error: ${err.error || "No se pudo crear"}`);
       }
     } catch (error) {
       console.error("Error creando carpeta:", error);
@@ -416,7 +417,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* ✅ CAMBIO CLAVE: Link a página de usuarios (NO ConnectedUsersPanel) */}
+            {/* ✅ ENLACE A PÁGINA DE USUARIOS (NO MODAL FLOTANTE) */}
             {dashboard.workspaceId && (
               <Link 
                 href={`/workspace/${dashboard.workspaceId}/users`}
