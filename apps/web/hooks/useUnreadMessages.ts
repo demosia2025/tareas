@@ -12,14 +12,7 @@ interface UnreadMessage {
   count: number;
 }
 
-interface Message {
-  id: string;
-  senderId: string;
-  createdAt: string;
-  content: string;
-}
-
-export function useUnreadMessages(workspaceId: string) {
+export function useUnreadMessages(workspaceId: string | null) {
   const { data: session } = useSession();
   const [unreadMessages, setUnreadMessages] = useState<Map<string, UnreadMessage>>(new Map());
   const [totalUnread, setTotalUnread] = useState(0);
@@ -44,11 +37,11 @@ export function useUnreadMessages(workspaceId: string) {
         const msgRes = await fetch(`/api/messages?otherUserId=${user.id}&workspaceId=${workspaceId}`, { cache: 'no-store' });
         if (msgRes.ok) {
           const msgData = await msgRes.json();
-          const messages: Message[] = msgData.messages || [];
+          const messages = msgData.messages || [];
           
           // Filtrar mensajes no leídos (últimos 30 minutos)
           const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-          const recentUnread = messages.filter((msg: Message) => 
+          const recentUnread = messages.filter((msg: any) => 
             msg.senderId === user.id && 
             new Date(msg.createdAt) > thirtyMinutesAgo
           );
