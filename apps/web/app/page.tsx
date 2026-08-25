@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { useDashboard } from "@/hooks/useDashboard";
+import { usePresence } from "@/hooks/usePresence";
 import { ClickUpSidebar } from "@/components/ClickUpSidebar";
 import { TaskModal } from "@/components/TaskModal";
 import { KanbanBoard } from "@/components/KanbanBoard";
@@ -28,6 +29,8 @@ export default function HomePage() {
   const { status, data: session } = useSession();
   const router = useRouter();
   const dashboard = useDashboard();
+
+  usePresence();
 
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
@@ -325,16 +328,17 @@ export default function HomePage() {
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
       
-      {/* ✅ HEADER RESPONSIVE CORREGIDO */}
-      <header className="min-h-[48px] sm:h-16 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] overflow-visible">
-        <div className="h-full px-2 sm:px-6 flex items-center justify-between gap-1 sm:gap-4 py-1 flex-wrap">
+      {/* HEADER CORREGIDO CON FLEX-WRAP Y ORDENAMIENTO RESPONSIVO */}
+      <header className="h-auto min-h-[56px] bg-slate-900/85 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] px-3 py-2">
+        <div className="w-full flex items-center justify-between gap-3 flex-wrap">
           
-          <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+          {/* Lado izquierdo: Botón menú lateral y Logo */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button 
               onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
-              className="md:hidden p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+              className="md:hidden p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors flex items-center justify-center"
             >
-              <Menu className="w-4 h-4" />
+              <Menu className="w-5 h-5" />
             </button>
             
             <div 
@@ -342,48 +346,47 @@ export default function HomePage() {
                 if (dashboard.selectedList) dashboard.setSelectedList(null);
                 router.push("/");
               }} 
-              className="flex items-center gap-1 sm:gap-2.5 group cursor-pointer flex-shrink-0"
+              className="flex items-center gap-2 group cursor-pointer"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
+                <Zap className="w-4 h-4 text-white" />
               </div>
-              <div className="hidden sm:flex items-center bg-slate-900/80 px-2 sm:px-3 py-1 rounded-lg border border-slate-800">
-                <span className="text-xs sm:text-sm font-bold text-cyan-400">
-                  Gestion de tareas
+              <div className="hidden sm:flex items-center bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+                <span className="text-sm font-bold text-cyan-400 truncate max-w-[140px] md:max-w-none">
+                  Gestión de tareas
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-3 flex-wrap justify-end flex-shrink-0">
+          {/* Lado derecho: Accesos rápidos, Selector, Usuarios y Perfil adaptados */}
+          <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
             
             {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
               <Link 
                 href="/admin2" 
-                className="flex items-center justify-center px-1.5 sm:px-2 py-1 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-[9px] sm:text-xs font-semibold text-cyan-400 min-h-[28px] sm:min-h-[32px]"
+                className="flex items-center justify-center px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-xs font-semibold text-cyan-400 gap-1.5"
                 title="Administrador"
               >
-                <Shield className="w-3.5 h-3.5 hidden sm:block" />
+                <Shield className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Admin</span>
-                <span className="sm:hidden">A</span>
               </Link>
             )}
             
             {(session?.user as any)?.role === 'superadmin' && (
               <Link 
                 href="/admin" 
-                className="flex items-center justify-center px-1.5 sm:px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-[9px] sm:text-xs font-semibold text-amber-400 min-h-[28px] sm:min-h-[32px]"
+                className="flex items-center justify-center px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-semibold text-amber-400 gap-1.5"
                 title="Super Admin"
               >
-                <Shield className="w-3.5 h-3.5 hidden sm:block" />
+                <Shield className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Super</span>
-                <span className="sm:hidden">S</span>
               </Link>
             )}
 
-            {/* ✅ SELECTOR DE WORKSPACES - SIEMPRE VISIBLE */}
+            {/* Selector de Workspace */}
             {dashboard.memberships && dashboard.memberships.length > 0 && (
-              <div ref={workspaceMenuRef} className="max-w-[120px] sm:max-w-[200px]">
+              <div ref={workspaceMenuRef} className="w-[130px] sm:w-[180px]">
                 <WorkspaceSelector
                   memberships={dashboard.memberships}
                   currentWorkspaceId={dashboard.workspaceId || ""}
@@ -414,16 +417,20 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Panel de usuarios conectados (Visible ahora también de forma compacta en pantallas medianas) */}
             {dashboard.workspaceId && (
-              <ConnectedUsersPanel workspaceId={dashboard.workspaceId} />
+              <div className="flex items-center">
+                <ConnectedUsersPanel workspaceId={dashboard.workspaceId} />
+              </div>
             )}
             
+            {/* Menú de Perfil */}
             <div className="relative" ref={profileMenuRef}>
               <button 
                 onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} 
-                className="flex items-center gap-1 px-1 py-0.5 rounded-lg hover:bg-slate-800/60 transition-all border border-slate-800 min-h-[28px] sm:min-h-[32px]"
+                className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800/60 transition-all border border-slate-800"
               >
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-[10px]">
+                <div className="w-7 h-7 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                   {(session?.user?.name || "U")[0].toUpperCase()}
                 </div>
                 <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
@@ -465,8 +472,8 @@ export default function HomePage() {
         
         <aside 
           className={`
-            absolute md:relative z-30 h-full w-64 sm:w-72 flex-shrink-0 
-            bg-slate-900/90 md:bg-slate-900/40 
+            absolute md:relative z-30 h-full w-72 flex-shrink-0 
+            bg-slate-900/95 md:bg-slate-900/40 
             border-r border-slate-800/80 backdrop-blur-2xl 
             transition-transform duration-300 ease-in-out 
             flex flex-col overflow-hidden
@@ -489,11 +496,11 @@ export default function HomePage() {
           </div>
         </aside>
 
-        <main className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
+        <main className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
           {dashboard.selectedList ? (
             <>
-              <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 sm:gap-4">
+              <div className="px-4 sm:px-6 py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider uppercase shadow-inner transition-all duration-300 ${dashboard.isSyncing ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
                       {dashboard.isSyncing ? <><RefreshCw className="w-3 h-3 animate-spin" /><span>Sincronizando...</span></> : <><Sparkles className="w-3 h-3 animate-pulse" /><span>Activa</span></>}
@@ -502,37 +509,37 @@ export default function HomePage() {
                     <p className="text-[11px] text-slate-400 font-light">{dashboard.filteredTasks?.length || 0} {(dashboard.filteredTasks?.length === 1) ? 'tarea en curso' : 'tareas en curso'}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={() => dashboard.setIsPaletteOpen(true)} className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all shadow-sm group">
-                      <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" /><span className="hidden sm:inline">Buscar...</span>
-                      <kbd className="px-1 py-0.5 text-[9px] bg-slate-800/80 border border-slate-700 rounded-lg text-slate-400 font-mono">⌘K</kbd>
+                    <button onClick={() => dashboard.setIsPaletteOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all shadow-sm group">
+                      <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" /><span>Buscar...</span>
+                      <kbd className="px-1.5 py-0.5 text-[10px] bg-slate-800/80 border border-slate-700 rounded-lg text-slate-400 font-mono hidden sm:inline-block">⌘K</kbd>
                     </button>
-                    <div className="flex bg-slate-900/90 rounded-xl p-1 border border-slate-800 shadow-inner">
-                      <button onClick={() => dashboard.setViewMode("list")} className={`px-2 sm:px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${dashboard.viewMode === "list" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
-                        <List className="w-3.5 h-3.5" /><span className="hidden sm:inline">Lista</span>
+                    <div className="flex bg-slate-900/90 rounded-xl p-1 border border-slate-800 shadow-inner overflow-x-auto max-w-full">
+                      <button onClick={() => dashboard.setViewMode("list")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "list" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                        <List className="w-3.5 h-3.5" /><span>Lista</span>
                       </button>
-                      <button onClick={() => dashboard.setViewMode("kanban")} className={`px-2 sm:px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${dashboard.viewMode === "kanban" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
-                        <LayoutGrid className="w-3.5 h-3.5" /><span className="hidden sm:inline">Tablero</span>
+                      <button onClick={() => dashboard.setViewMode("kanban")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "kanban" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                        <LayoutGrid className="w-3.5 h-3.5" /><span>Tablero</span>
                       </button>
-                      <button onClick={() => dashboard.setViewMode("calendar")} className={`px-2 sm:px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${dashboard.viewMode === "calendar" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
-                        <CalendarIcon className="w-3.5 h-3.5" /><span className="hidden sm:inline">Calendario</span>
+                      <button onClick={() => dashboard.setViewMode("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "calendar" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                        <CalendarIcon className="w-3.5 h-3.5" /><span>Calendario</span>
                       </button>
                     </div>
-                    <button onClick={dashboard.openCreateModal} className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 sm:px-4 py-1.5 bg-gradient-to-r from-cyan-500 via-cyan-600 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl transition-all text-xs font-bold shadow-lg shadow-cyan-500/25 active:scale-95 ml-auto sm:ml-0">
-                      <Plus className="w-3.5 h-3.5" /><span className="hidden sm:inline">Nueva Tarea</span><span className="sm:hidden">+</span>
+                    <button onClick={dashboard.openCreateModal} className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-cyan-500 via-cyan-600 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl transition-all text-xs font-bold shadow-lg shadow-cyan-500/25 active:scale-95 ml-auto sm:ml-0">
+                      <Plus className="w-3.5 h-3.5" /><span>Nueva Tarea</span>
                     </button>
                   </div>
                 </div>
                 
                 <div className="mt-3 pt-3 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 relative z-10">
-                  <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-[200px] sm:min-w-[240px]">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
                     <div className="relative flex-1 max-w-sm">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                       <input type="text" value={dashboard.searchQuery} onChange={(e) => dashboard.setSearchQuery(e.target.value)} placeholder="Filtrar tareas..." className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all shadow-inner" />
                       {dashboard.searchQuery && <button onClick={() => dashboard.setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"><X className="w-3.5 h-3.5" /></button>}
                     </div>
                     <div className="relative">
-                      <button onClick={() => dashboard.setIsFilterDropdownOpen(!dashboard.isFilterDropdownOpen)} className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${dashboard.statusFilter !== "all" || dashboard.priorityFilter !== "all" || dashboard.sortOption !== "custom" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300" : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"}`}>
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" /><span className="hidden sm:inline">Filtros & Orden</span>
+                      <button onClick={() => dashboard.setIsFilterDropdownOpen(!dashboard.isFilterDropdownOpen)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${dashboard.statusFilter !== "all" || dashboard.priorityFilter !== "all" || dashboard.sortOption !== "custom" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300" : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"}`}>
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" /><span>Filtros</span>
                       </button>
                       {dashboard.isFilterDropdownOpen && (
                         <>
@@ -557,9 +564,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-hidden p-3 sm:p-4 sm:p-6 lg:p-8 flex flex-col relative z-0">
+              <div className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col relative z-0 overflow-y-auto">
                 {dashboard.viewMode === "list" ? (
-                  <div className="max-w-4xl mx-auto w-full overflow-y-auto flex-1 pr-1">
+                  <div className="max-w-4xl mx-auto w-full">
                     <div className="space-y-1.5">
                       {dashboard.hierarchicalTasks?.map((task) => (
                         <InlineTaskRow key={task.id} task={task} depth={0} expandedTasks={dashboard.expandedTasks} customFields={dashboard.customFields} onToggleExpand={dashboard.toggleTaskExpand} onToggleStatus={(id, status) => dashboard.handleUpdateTask({ id, status })} onEdit={dashboard.openEditModal} onDelete={dashboard.handleDeleteTask} onCreateSubtask={dashboard.openCreateSubtaskModal} />
@@ -567,23 +574,23 @@ export default function HomePage() {
                     </div>
                   </div>
                 ) : dashboard.viewMode === "kanban" ? (
-                  <div className="h-full overflow-x-auto flex-1"><KanbanBoard tasks={dashboard.filteredTasks || []} onUpdateStatus={async (taskId, newStatus) => { await dashboard.handleUpdateTask({ id: taskId, status: newStatus }); }} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="w-full min-h-[500px] flex-1 overflow-x-auto"><KanbanBoard tasks={dashboard.filteredTasks || []} onUpdateStatus={async (taskId, newStatus) => { await dashboard.handleUpdateTask({ id: taskId, status: newStatus }); }} onEditTask={dashboard.openEditModal} /></div>
                 ) : (
-                  <div className="h-full flex-1 flex flex-col overflow-hidden"><FunctionalCalendarView tasks={dashboard.filteredTasks || []} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="w-full min-h-[500px] flex-1 flex flex-col"><FunctionalCalendarView tasks={dashboard.filteredTasks || []} onEditTask={dashboard.openEditModal} /></div>
                 )}
               </div>
             </>
           ) : hasWorkspace ? (
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
               <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-8 sm:mb-10">
+                <div className="text-center mb-8">
                   <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">¿Qué quieres hacer hoy?</h1>
                   <p className="text-xs text-slate-400">Elige una opción para continuar</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-0 sm:gap-4 md:gap-8 items-start">
-                  <div className={`space-y-4 sm:space-y-5 ${hasWorkspace ? 'md:border-r md:border-slate-800/60 md:pr-4 sm:md:pr-8' : ''}`}>
-                    <div className="flex items-center gap-2 sm:gap-2.5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                  <div className="space-y-4 lg:border-r lg:border-slate-800/60 lg:pr-8">
+                    <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
                         <Clock className="w-4 h-4 text-cyan-400" />
                       </div>
@@ -610,9 +617,9 @@ export default function HomePage() {
                                 setTimeout(() => dashboard.openEditModal(task as any), 300);
                               }
                             }}
-                            className="w-full text-left p-3 sm:p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
+                            className="w-full text-left p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
                           >
-                            <div className="flex items-start justify-between gap-2 sm:gap-3">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0">
                                 <h3 className="text-sm font-semibold text-white truncate group-hover:text-cyan-300 transition-colors">
                                   {task.title}
@@ -622,7 +629,7 @@ export default function HomePage() {
                                     {task.description}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-1.5 sm:gap-2 mt-2 flex-wrap">
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
                                     task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                                     task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
@@ -660,8 +667,8 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  <div className="space-y-4 sm:space-y-5 md:pl-4 sm:md:pl-8">
-                    <div className="flex items-center gap-2 sm:gap-2.5">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center">
                         <Sparkles className="w-4 h-4 text-purple-400" />
                       </div>
@@ -671,7 +678,7 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 sm:space-y-2.5">
+                    <div className="space-y-2.5">
                       <button
                         onClick={() => {
                           if (!canCreateWorkspace) {
@@ -686,7 +693,7 @@ export default function HomePage() {
                             setIsCreateWorkspaceModalOpen(true);
                           }
                         }}
-                        className="w-full flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-amber-500/30 rounded-xl transition-all group"
+                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-amber-500/30 rounded-xl transition-all group"
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Building2 className="w-5 h-5 text-amber-400" />
@@ -700,7 +707,7 @@ export default function HomePage() {
 
                       <button
                         onClick={() => setIsCreateSpaceModalOpen(true)}
-                        className="w-full flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
+                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <FolderKanban className="w-5 h-5 text-purple-400" />
@@ -714,7 +721,7 @@ export default function HomePage() {
 
                       <button
                         onClick={() => setIsCreateFolderModalOpen(true)}
-                        className="w-full flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
+                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Folder className="w-5 h-5 text-indigo-400" />
@@ -728,7 +735,7 @@ export default function HomePage() {
 
                       <button
                         onClick={handleCreateTaskFromHome}
-                        className="w-full flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
+                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <CheckSquare className="w-5 h-5 text-cyan-400" />

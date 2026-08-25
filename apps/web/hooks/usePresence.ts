@@ -1,36 +1,42 @@
-import { useEffect } from "react";
+"use client";
 
-export function usePresence(workspaceId?: string) {
+import { useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
+
+export function usePresence() {
+  const { data: session, status } = useSession();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    // Función para enviar ping de presencia
-    const sendPresencePing = async () => {
+    // Solo ejecutar si la sesión está autenticada y el usuario existe
+    if (status !== "authenticated" || !session?.user?.id) return;
+
+    const updatePresence = async () => {
       try {
+        // ✅ CORREGIDO: No enviamos el userId en el body. 
+        // La API ya lo obtiene de forma segura desde el servidor con auth()
         await fetch("/api/user/presence", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
         });
       } catch (error) {
-        console.error("Error sending presence ping:", error);
+        console.error("Error updating presence:", error);
       }
     };
 
-    // Enviar ping inmediatamente
-    sendPresencePing();
+    // Actualizar inmediatamente
+    updatePresence();
+    
+    // Actualizar cada 30 segundos
+    intervalRef.current = setInterval(updatePresence, 30000);
 
-    // Enviar ping cada 30 segundos
-    const pingInterval = setInterval(sendPresencePing, 30000);
-
-    // Enviar ping cuando la ventana vuelva a estar activa
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        sendPresencePing();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Actualizar al cerrar la pestaña
+    const handleBeforeUnload = () => updatePresence();
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      clearInterval(pingInterval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [workspaceId]);
+  }, [session?.user?.id, status]);
 }
