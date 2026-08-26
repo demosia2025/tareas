@@ -1,7 +1,7 @@
 // apps/web/app/page.tsx
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation"; // ✅ Actualizado
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -26,7 +26,6 @@ import PlanLimitModal from "@/components/PlanLimitModal";
 export default function HomePage() {
   const { status, data: session } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams(); // ✅ Agregado para leer parámetros de la URL
   const dashboard = useDashboard();
 
   usePresence();
@@ -68,9 +67,11 @@ export default function HomePage() {
     }
   }, [status, router]);
 
-  // ✅ NUEVO: Detectar si debemos abrir una tarea específica desde la URL
+  // ✅ CORREGIDO: Detectar si debemos abrir una tarea específica desde la URL.
+  // Usamos window.location.search en lugar de useSearchParams para evitar el error de build en Vercel.
   useEffect(() => {
-    const openTaskId = searchParams.get("openTask");
+    const params = new URLSearchParams(window.location.search);
+    const openTaskId = params.get("openTask");
     
     if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
       const fetchAndOpenTask = async () => {
@@ -81,11 +82,15 @@ export default function HomePage() {
             const taskToOpen = tasks.find((t: any) => t.id === openTaskId);
             
             if (taskToOpen) {
-              // Abre el modal con la tarea encontrada
-              dashboard.openEditModal(taskToOpen);
-              
-              // Limpia el parámetro de la URL para que no se abra de nuevo al recargar
-              router.replace("/");
+              if (dashboard.openEditModal) {
+                dashboard.openEditModal(taskToOpen);
+              } else {
+                // Fallback por si el hook usa nombres de funciones diferentes
+                (dashboard as any).setEditingTask?.(taskToOpen);
+                (dashboard as any).setIsModalOpen?.(true);
+              }
+              // Limpiar el parámetro de la URL sin recargar la página
+              window.history.replaceState({}, "", "/");
             }
           }
         } catch (error) {
@@ -95,7 +100,7 @@ export default function HomePage() {
       
       fetchAndOpenTask();
     }
-  }, [searchParams, dashboard.isModalOpen, dashboard.workspaceId, router]);
+  }, [dashboard.isModalOpen, dashboard.workspaceId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
