@@ -1,3 +1,4 @@
+// apps/web/components/TaskModal.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { X, Plus, AlertCircle, Circle, UserPlus, Users, Check } from "lucide-react";
@@ -49,7 +50,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
       setPriority(initialData.priority ?? 2);
       setDueDate(initialData.dueDate ? new Date(initialData.dueDate).toISOString().split('T')[0] : "");
       setSelectedListId(initialData.listId || listId || "");
-      setAssigneeId(initialData.assigneeId || initialData.assignee?.id || null);
+      setAssigneeId(initialData.assigneeId || initialData?.assignee?.id || null);
     } else {
       setTitle("");
       setDescription("");
@@ -106,7 +107,6 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: inviteMemberId }),
       });
-
       if (res.ok) {
         const member = workspaceMembers.find(m => (m.user?.id || m.id) === inviteMemberId);
         if (member) {
@@ -123,15 +123,15 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
   };
 
   if (!isOpen) return null;
+
   const activeListId = selectedListId || listId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
-      {/* Contenedor principal sin desbordamiento (overflow-hidden) */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header compacto */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-950/20">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-950/20 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setActiveTab("details")}
@@ -157,8 +157,8 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
           </button>
         </div>
 
-        {/* Contenido */}
-        <div className="flex-1">
+        {/* Contenido: flex-1 permite que crezca naturalmente */}
+        <div className="flex-1 overflow-y-auto">
           {activeTab === "details" ? (
             <form onSubmit={handleSubmit} className="p-5 space-y-3">
               {!activeListId && (
@@ -168,7 +168,6 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                 </div>
               )}
 
-              {/* Título */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 mb-1">
                   Título <span className="text-rose-400">*</span>
@@ -183,11 +182,8 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                 />
               </div>
 
-              {/* Descripción compacta */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  Descripción
-                </label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Descripción</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -197,7 +193,6 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                 />
               </div>
 
-              {/* Responsable Principal */}
               {workspaceId && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
@@ -212,11 +207,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                     <option value="">Sin asignar</option>
                     {workspaceMembers.map((m: any) => {
                       const user = m.user || m;
-                      return (
-                        <option key={user.id} value={user.id}>
-                          {user.name || user.email}
-                        </option>
-                      );
+                      return <option key={user.id} value={user.id}>{user.name || user.email}</option>;
                     })}
                   </select>
                   {assigneeId && (
@@ -225,7 +216,6 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                 </div>
               )}
 
-              {/* Invitar Colaboradores */}
               {workspaceId && workspaceMembers.length > 0 && (
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1.5">
@@ -243,11 +233,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                         .filter((m: any) => (m.user?.id || m.id) !== assigneeId)
                         .map((m: any) => {
                           const user = m.user || m;
-                          return (
-                            <option key={user.id} value={user.id}>
-                              {user.name || user.email}
-                            </option>
-                          );
+                          return <option key={user.id} value={user.id}>{user.name || user.email}</option>;
                         })}
                     </select>
                     <button
@@ -263,52 +249,27 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
                 </div>
               )}
 
-              {/* Fila en dos columnas para Estado, Prioridad y Fecha */}
               <div className="grid grid-cols-3 gap-2 pt-0.5">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-300 mb-1">Estado</label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none cursor-pointer"
-                  >
-                    {statusOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none cursor-pointer">
+                    {statusOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-[10px] font-bold text-slate-300 mb-1">Prioridad</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none cursor-pointer"
-                  >
-                    {priorityOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                  <select value={priority} onChange={(e) => setPriority(Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none cursor-pointer">
+                    {priorityOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-[10px] font-bold text-slate-300 mb-1">Vencimiento</label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-white focus:outline-none"
-                  />
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-white focus:outline-none" />
                 </div>
               </div>
 
-              {/* Botones de acción inferiores */}
               <div className="flex gap-2 pt-3 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-4 py-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all text-xs font-semibold"
-                >
+                <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all text-xs font-semibold">
                   Cancelar
                 </button>
                 <button
@@ -321,7 +282,8 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
               </div>
             </form>
           ) : (
-            <div className="p-4 h-[350px] overflow-y-auto">
+            /* ✅ CORREGIDO: Se eliminó h-[350px] y overflow-y-auto de este contenedor */
+            <div className="p-4">
               {initialData?.id ? (
                 <ActivityTab taskId={initialData.id} workspaceId={workspaceId || ""} />
               ) : (

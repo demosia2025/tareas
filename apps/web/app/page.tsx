@@ -1,7 +1,7 @@
 // apps/web/app/page.tsx
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // ✅ Actualizado
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -26,6 +26,7 @@ import PlanLimitModal from "@/components/PlanLimitModal";
 export default function HomePage() {
   const { status, data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams(); // ✅ Agregado para leer parámetros de la URL
   const dashboard = useDashboard();
 
   usePresence();
@@ -66,6 +67,35 @@ export default function HomePage() {
       router.push("/login");
     }
   }, [status, router]);
+
+  // ✅ NUEVO: Detectar si debemos abrir una tarea específica desde la URL
+  useEffect(() => {
+    const openTaskId = searchParams.get("openTask");
+    
+    if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
+      const fetchAndOpenTask = async () => {
+        try {
+          const res = await fetch(`/api/tasks?workspaceId=${dashboard.workspaceId}`);
+          if (res.ok) {
+            const tasks = await res.json();
+            const taskToOpen = tasks.find((t: any) => t.id === openTaskId);
+            
+            if (taskToOpen) {
+              // Abre el modal con la tarea encontrada
+              dashboard.openEditModal(taskToOpen);
+              
+              // Limpia el parámetro de la URL para que no se abra de nuevo al recargar
+              router.replace("/");
+            }
+          }
+        } catch (error) {
+          console.error("Error al abrir la tarea desde la URL:", error);
+        }
+      };
+      
+      fetchAndOpenTask();
+    }
+  }, [searchParams, dashboard.isModalOpen, dashboard.workspaceId, router]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

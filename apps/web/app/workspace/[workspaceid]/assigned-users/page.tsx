@@ -1,10 +1,9 @@
-// apps/web/app/workspace/[workspaceId]/assigned-users/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Users, Clock, ArrowLeft, Search, CheckSquare, ChevronRight, UserCircle } from "lucide-react";
+import { Users, Clock, ArrowLeft, Search, CheckSquare, ChevronRight, UserCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import AssignedTasksModal from "@/components/AssignedTasksModal";
 
@@ -25,6 +24,7 @@ interface AssignedTask {
   timeAgo: string;
   diffDays: number;
   diffHours: number;
+  listName?: string;
 }
 
 interface UserWithTasks extends WorkspaceUser {
@@ -54,7 +54,6 @@ export default function AssignedUsersPage() {
     try {
       setLoading(true);
       
-      // 1. Obtener miembros del workspace
       const membersRes = await fetch(`/api/workspace/${workspaceId}/members`);
       if (!membersRes.ok) {
         throw new Error("Error al cargar miembros del workspace");
@@ -62,23 +61,18 @@ export default function AssignedUsersPage() {
       const members = await membersRes.json();
       const membersArray = Array.isArray(members) ? members : members.members || [];
 
-      // 2. Obtener TODAS las tareas del workspace (CON workspaceId)
       const tasksRes = await fetch(`/api/tasks?workspaceId=${workspaceId}`);
       let allTasks: any[] = [];
       
       if (tasksRes.ok) {
         const tasksData = await tasksRes.json();
         allTasks = Array.isArray(tasksData) ? tasksData : [];
-      } else {
-        console.warn("No se pudieron cargar las tareas del workspace");
       }
 
-      // 3. Para cada miembro, filtrar sus tareas asignadas
       const usersWithTasks = membersArray.map((member: any) => {
         const user = member.user || member;
         const userId = user.id;
 
-        // Filtrar tareas donde este usuario es assignee
         const userTasks = allTasks.filter((task: any) => task.assigneeId === userId);
 
         const now = new Date();
@@ -108,6 +102,7 @@ export default function AssignedUsersPage() {
             timeAgo,
             diffDays,
             diffHours,
+            listName: task.list?.name,
           };
         });
 
@@ -178,6 +173,11 @@ export default function AssignedUsersPage() {
     if (p >= 3) return "text-orange-400";
     if (p >= 2) return "text-cyan-400";
     return "text-slate-400";
+  };
+
+  // ✅ CAMBIO CLAVE: Redirige al dashboard con el parámetro openTask
+  const handleGoToTask = (taskId: string) => {
+    router.push(`/?openTask=${taskId}`);
   };
 
   return (
@@ -266,7 +266,7 @@ export default function AssignedUsersPage() {
                           setSelectedUserForModal(user);
                         }}
                         className="p-2 hover:bg-cyan-500/10 rounded-lg text-cyan-400 transition-colors"
-                        title="Ver tareas asignadas"
+                        title="Ver todas las tareas"
                       >
                         <CheckSquare className="w-4 h-4" />
                       </button>
@@ -292,7 +292,7 @@ export default function AssignedUsersPage() {
                       {user.tasks.map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg hover:border-slate-700 transition-all"
+                          className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg hover:border-slate-700 transition-all group"
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-white truncate">{task.title}</p>
@@ -307,16 +307,32 @@ export default function AssignedUsersPage() {
                               <span className={`text-[9px] font-medium ${getPriorityColor(task.priority)}`}>
                                 {getPriorityLabel(task.priority)}
                               </span>
+                              {task.listName && (
+                                <span className="text-[9px] text-slate-500">📁 {task.listName}</span>
+                              )}
                             </div>
                           </div>
-                          <div
-                            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-medium ${getElapsedTimeColor(
-                              task.diffDays
-                            )}`}
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span className="hidden sm:inline">{task.timeAgo}</span>
-                            <span className="sm:hidden">{task.diffDays < 1 ? `${task.diffHours}h` : `${task.diffDays}d`}</span>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-medium ${getElapsedTimeColor(
+                                task.diffDays
+                              )}`}
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span className="hidden sm:inline">{task.timeAgo}</span>
+                              <span className="sm:hidden">{task.diffDays < 1 ? `${task.diffHours}h` : `${task.diffDays}d`}</span>
+                            </div>
+                            {/* ✅ BOTÓN PARA IR A LA TAREA */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGoToTask(task.id);
+                              }}
+                              className="p-1.5 text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                              title="Ir a la tarea"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ))}

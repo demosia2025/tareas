@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { X, Clock, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface AssignedTasksModalProps {
   userId: string;
@@ -32,6 +33,7 @@ export default function AssignedTasksModal({
   isOpen,
   onClose,
 }: AssignedTasksModalProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function AssignedTasksModal({
     if (isOpen && userId && workspaceId) {
       fetchAssignedTasks();
     } else {
-      setTasks([]); // Limpiar al cerrar
+      setTasks([]);
     }
   }, [isOpen, userId, workspaceId]);
 
@@ -48,9 +50,7 @@ export default function AssignedTasksModal({
     setLoading(true);
     setError(null);
     try {
-      // Consultamos directamente filtrando por workspace y por el usuario asignado
       const res = await fetch(`/api/tasks?workspaceId=${workspaceId}&assigneeId=${userId}`);
-      
       if (res.ok) {
         const userTasks: Task[] = await res.json();
         setTasks(Array.isArray(userTasks) ? userTasks : []);
@@ -101,6 +101,12 @@ export default function AssignedTasksModal({
     if (priority === 3) return "⚡ Alta";
     if (priority === 2) return "🟡 Media";
     return "🔵 Baja";
+  };
+
+  // ✅ CAMBIO CLAVE: Redirige al dashboard con el parámetro openTask
+  const handleGoToTask = (taskId: string) => {
+    router.push(`/?openTask=${taskId}`);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -171,14 +177,20 @@ export default function AssignedTasksModal({
                     </div>
                   </div>
                   
-                  <div className="flex flex-col items-end gap-1 shrink-0">
+                  <div className="flex flex-col items-end gap-2 shrink-0">
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-medium text-slate-300">
                       <Clock className="w-3 h-3 text-cyan-400" />
                       <span>{getElapsedTime(task.updatedAt || task.createdAt)}</span>
                     </div>
-                    <span className="text-[9px] text-slate-600">
-                      {new Date(task.updatedAt || task.createdAt).toLocaleDateString("es-ES")}
-                    </span>
+                    {/* ✅ BOTÓN PARA IR A LA TAREA */}
+                    <button
+                      onClick={() => handleGoToTask(task.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-all"
+                      title="Ir a la tarea"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Ir a la tarea</span>
+                    </button>
                   </div>
                 </div>
               ))}

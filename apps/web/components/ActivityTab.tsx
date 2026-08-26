@@ -65,7 +65,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           setSelectedAssigneeId(data.task.assigneeId);
         }
       }
-
       const memRes = await fetch(`/api/tasks/${taskId}/members`);
       if (memRes.ok) {
         const memData = await memRes.json();
@@ -88,13 +87,11 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         console.warn("ActivityTab: workspaceId no está definido.");
         return;
       }
-
       try {
         let res = await fetch(`/api/workspace/${workspaceId}/members`);
         if (!res.ok) {
           res = await fetch(`/api/workspaces/${workspaceId}/members`);
         }
-
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : data.members || [];
@@ -106,17 +103,14 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         console.error("Error de red al cargar miembros del workspace:", error);
       }
     };
-
     fetchWorkspaceMembers();
   }, [workspaceId]);
 
-  // ✅ FUNCIÓN PARA ASIGNAR RESPONSABLE
   const handleAssignResponsible = async () => {
     if (!selectedAssigneeId) {
       alert("Por favor selecciona un usuario");
       return;
     }
-
     setAssigning(true);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
@@ -124,7 +118,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assigneeId: selectedAssigneeId }),
       });
-
       if (res.ok) {
         await fetchData();
         alert("Responsable asignado correctamente");
@@ -188,7 +181,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
       alert("Por favor selecciona un usuario.");
       return;
     }
-
     setLoadingInvite(true);
     try {
       const res = await fetch(`/api/tasks/${taskId}/members`, {
@@ -196,7 +188,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: inviteMemberId }),
       });
-
       if (res.ok) {
         setInviteMemberId("");
         fetchData();
@@ -245,8 +236,9 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
   });
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4 text-slate-200">
-      <div className="flex border-b border-slate-800 pb-2 gap-4">
+    <div className="flex flex-col text-slate-200">
+      {/* Sub-navegación interna */}
+      <div className="flex border-b border-slate-800 pb-2 gap-4 flex-shrink-0">
         <button
           onClick={() => setActiveSubTab("chat")}
           className={`text-xs font-bold uppercase tracking-wider pb-1 transition-colors ${
@@ -266,6 +258,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
       </div>
 
       {activeSubTab === "chat" ? (
+        /* ✅ CHAT: Mantiene h-[65vh] porque necesita scroll para mensajes */
         <div className="flex flex-col h-[65vh] space-y-3">
           {attachments.length > 0 && (
             <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
@@ -308,7 +301,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               </div>
             </div>
           )}
-
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">
             {Array.isArray(activities) && activities.length > 0 ? (
               activities.map((activity) => (
@@ -333,7 +325,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               <p className="text-xs text-slate-500 text-center py-6">No hay mensajes ni actividad registrada aún.</p>
             )}
           </div>
-
           <form onSubmit={(e) => handleSend(e)} className="pt-2 flex items-center gap-2 mt-auto border-t border-slate-800">
             <label className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors" title="Adjuntar archivo">
               <Paperclip className="w-4 h-4" />
@@ -357,8 +348,10 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           </form>
         </div>
       ) : (
-        <div className="flex flex-col h-[65vh] space-y-4">
-          <div className="flex gap-2 bg-slate-900/40 p-1 rounded-lg border border-slate-800">
+        /* ✅ MIEMBROS: SIN h-[65vh], compacto sin scroll general */
+        <div className="space-y-3">
+          {/* Pestañas internas: Asignar / Invitar */}
+          <div className="flex gap-2 bg-slate-900/40 p-1 rounded-lg border border-slate-800 flex-shrink-0">
             <button
               onClick={() => setMemberTab("assign")}
               className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
@@ -380,31 +373,17 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           </div>
 
           {memberTab === "assign" ? (
+            /* SECCIÓN: ASIGNAR RESPONSABLE - Compacta sin scroll general */
             <div className="space-y-3">
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
                   Responsable Principal
                 </h4>
-                <div className="relative mb-2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar usuario..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
                 <select
                   value={selectedAssigneeId}
                   onChange={(e) => setSelectedAssigneeId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 mb-3"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 mb-2"
                 >
                   <option value="">Sin asignar</option>
                   {filteredMembers.map((m) => {
@@ -416,7 +395,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                     );
                   })}
                 </select>
-                {/* ✅ BOTÓN PARA ASIGNAR */}
                 <button
                   onClick={handleAssignResponsible}
                   disabled={assigning || !selectedAssigneeId}
@@ -428,13 +406,17 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                     <><Check className="w-3.5 h-3.5" /> Asignar Responsable</>
                   )}
                 </button>
+                {selectedAssigneeId && (
+                  <span className="text-[10px] text-emerald-400 mt-1 block">✓ Responsable asignado correctamente</span>
+                )}
               </div>
 
+              {/* ✅ Lista de usuarios con scroll interno SOLO en la lista (max-h-32) */}
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Usuarios de la Organización ({filteredMembers.length})
                 </h4>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
+                <div className="space-y-1 max-h-32 overflow-y-auto">
                   {filteredMembers.length === 0 ? (
                     <p className="text-xs text-slate-500 text-center py-2">No hay usuarios que coincidan o cargando...</p>
                   ) : (
@@ -462,27 +444,13 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               </div>
             </div>
           ) : (
+            /* SECCIÓN: INVITAR COLABORADORES - Compacta sin scroll general */
             <div className="space-y-3">
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-purple-400" />
                   Invitar Colaboradores
                 </h4>
-                <div className="relative mb-2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar usuario..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
                 <div className="flex gap-2">
                   <select
                     value={inviteMemberId}
@@ -511,11 +479,12 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                 </div>
               </div>
 
+              {/* ✅ Lista de colaboradores con scroll interno SOLO en la lista (max-h-32) */}
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Colaboradores Invitados ({members.length})
                 </h4>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
+                <div className="space-y-1 max-h-32 overflow-y-auto">
                   {members.length === 0 ? (
                     <p className="text-xs text-slate-500 text-center py-2">No hay colaboradores invitados a esta tarea.</p>
                   ) : (
