@@ -30,16 +30,24 @@ export default function AssigneeSelector({
   const [selectedId, setSelectedId] = useState<string | null>(currentAssigneeId || null);
   const [loading, setLoading] = useState(false);
 
+  // Sincronizar el estado interno si cambia la prop desde el padre
   useEffect(() => {
-    fetchWorkspaceMembers();
+    setSelectedId(currentAssigneeId || null);
+  }, [currentAssigneeId]);
+
+  useEffect(() => {
+    if (workspaceId) {
+      fetchWorkspaceMembers();
+    }
   }, [workspaceId]);
 
   const fetchWorkspaceMembers = async () => {
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/members`);
+      // Ruta corregida para coincidir con la usada en TaskDetailModal
+      const res = await fetch(`/api/workspace/${workspaceId}/members`);
       if (res.ok) {
         const data = await res.json();
-        setMembers(data);
+        setMembers(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error("Error al cargar los miembros del workspace:", error);
@@ -49,8 +57,8 @@ export default function AssigneeSelector({
   const handleAssign = async (userId: string | null) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/assignees`, {
-        method: "POST",
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assigneeId: userId }),
       });
@@ -58,9 +66,13 @@ export default function AssigneeSelector({
       if (res.ok) {
         setSelectedId(userId);
         onAssigneeChanged(userId);
+      } else {
+        const err = await res.json();
+        alert(err.error || "No se pudo actualizar el responsable");
       }
     } catch (error) {
       console.error("Error al actualizar la asignación de la tarea:", error);
+      alert("Error al actualizar la asignación");
     } finally {
       setLoading(false);
     }
@@ -77,14 +89,17 @@ export default function AssigneeSelector({
         value={selectedId || ""}
         onChange={(e) => handleAssign(e.target.value ? e.target.value : null)}
         disabled={loading}
-        className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50 shadow-inner"
+        className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500/50 shadow-inner cursor-pointer disabled:opacity-50"
       >
         <option value="">Sin asignar</option>
-        {members.map((m) => (
-          <option key={m.user.id} value={m.user.id}>
-            {m.user.name || m.user.email}
-          </option>
-        ))}
+        {members.map((m) => {
+          const userObj = m.user || m; // Soporte flexible por si la API devuelve el usuario plano
+          return (
+            <option key={userObj.id} value={userObj.id}>
+              {userObj.name || userObj.email}
+            </option>
+          );
+        })}
       </select>
     </div>
   );

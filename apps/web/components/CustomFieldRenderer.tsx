@@ -1,19 +1,24 @@
-"use client"
+"use client";
 
 interface CustomField {
-  id: string
-  name: string
-  type: "text" | "number" | "select" | "date" | "checkbox"
-  options?: string[]
+  id: string;
+  name: string;
+  type: "text" | "number" | "select" | "date" | "checkbox";
+  options?: string[];
 }
 
 interface CustomFieldRendererProps {
-  field: CustomField
-  value: any
-  onChange: (fieldId: string, value: any) => void
+  field: CustomField;
+  value: any;
+  onChange: (fieldId: string, value: any) => void;
 }
 
 export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRendererProps) {
+  // ✅ PROTECCIÓN: Si no se pasa el campo, no renderiza nada (evita el error "Cannot read properties of undefined")
+  if (!field) {
+    return null;
+  }
+
   switch (field.type) {
     case "text":
       return (
@@ -24,7 +29,7 @@ export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRende
           className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 placeholder-slate-500"
           placeholder="Texto..."
         />
-      )
+      );
     case "number":
       return (
         <input
@@ -34,7 +39,7 @@ export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRende
           className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 placeholder-slate-500"
           placeholder="0"
         />
-      )
+      );
     case "select":
       return (
         <select
@@ -47,7 +52,7 @@ export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRende
             <option key={index} value={opt}>{opt}</option>
           ))}
         </select>
-      )
+      );
     case "date":
       return (
         <input
@@ -56,7 +61,7 @@ export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRende
           onChange={(e) => onChange(field.id, e.target.value)}
           className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
         />
-      )
+      );
     case "checkbox":
       return (
         <div className="flex items-center gap-2">
@@ -68,8 +73,8 @@ export function CustomFieldRenderer({ field, value, onChange }: CustomFieldRende
           />
           <span className="text-sm text-slate-400">Marcar</span>
         </div>
-      )
+      );
     default:
-      return null
+      return null;
   }
 }

@@ -1,8 +1,6 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import { X, Plus, AlertCircle, CheckCircle2, Clock, Circle } from "lucide-react";
-import { CustomFieldRenderer } from "./CustomFieldRenderer";
+import { X, Plus, AlertCircle, Circle, UserPlus, Users, Check } from "lucide-react";
 import { ActivityTab } from "./ActivityTab";
 
 interface TaskModalProps {
@@ -11,6 +9,7 @@ interface TaskModalProps {
   onSave: (taskData: any) => Promise<void>;
   initialData?: any;
   listId?: string;
+  workspaceId?: string;
 }
 
 const priorityOptions = [
@@ -27,7 +26,7 @@ const statusOptions = [
   { value: "done", label: "Completado", color: "bg-emerald-500" },
 ];
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, listId, workspaceId }: TaskModalProps) {
   const [activeTab, setActiveTab] = useState<"details" | "activity">("details");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -36,6 +35,12 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
   const [dueDate, setDueDate] = useState("");
   const [selectedListId, setSelectedListId] = useState(listId || "");
   const [loading, setLoading] = useState(false);
+  
+  // ✅ NUEVOS ESTADOS PARA ASIGNAR RESPONSABLE E INVITAR
+  const [assigneeId, setAssigneeId] = useState<string | null>(initialData?.assigneeId || initialData?.assignee?.id || null);
+  const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
+  const [inviteMemberId, setInviteMemberId] = useState("");
+  const [invitedMembers, setInvitedMembers] = useState<any[]>([]);
 
   useEffect(() => {
     if (initialData) {
@@ -45,6 +50,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
       setPriority(initialData.priority ?? 2);
       setDueDate(initialData.dueDate ? new Date(initialData.dueDate).toISOString().split('T')[0] : "");
       setSelectedListId(initialData.listId || listId || "");
+      setAssigneeId(initialData.assigneeId || initialData.assignee?.id || null);
     } else {
       setTitle("");
       setDescription("");
@@ -52,9 +58,20 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
       setPriority(2);
       setDueDate("");
       setSelectedListId(listId || "");
+      setAssigneeId(null);
     }
     setActiveTab("details");
   }, [initialData, isOpen, listId]);
+
+  // ✅ OBTENER MIEMBROS DEL WORKSPACE
+  useEffect(() => {
+    if (isOpen && workspaceId) {
+      fetch(`/api/workspace/${workspaceId}/members`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setWorkspaceMembers(Array.isArray(data) ? data : []))
+        .catch(() => setWorkspaceMembers([]));
+    }
+  }, [isOpen, workspaceId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +88,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
         status,
         priority,
         dueDate: dueDate || null,
+        assigneeId: assigneeId,
         parentId: initialData?.parentId || initialData?.parentTaskId || undefined,
         parentTaskId: initialData?.parentId || initialData?.parentTaskId || undefined,
       });
@@ -79,6 +97,34 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ FUNCIÓN PARA INVITAR COLABORADOR
+  const handleInviteMember = async () => {
+    if (!inviteMemberId || !initialData?.id) return;
+    
+    try {
+      const res = await fetch(`/api/tasks/${initialData.id}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: inviteMemberId }),
+      });
+
+      if (res.ok) {
+        const member = workspaceMembers.find(m => (m.user?.id || m.id) === inviteMemberId);
+        if (member) {
+          setInvitedMembers(prev => [...prev, member.user || member]);
+        }
+        setInviteMemberId("");
+        alert("Colaborador invitado exitosamente");
+      } else {
+        const err = await res.json();
+        alert(err.error || "Error al invitar colaborador");
+      }
+    } catch (error) {
+      console.error("Error inviting member:", error);
+      alert("Error al invitar colaborador");
     }
   };
 
@@ -119,7 +165,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
         {/* Contenido */}
         <div className="flex-1 overflow-hidden">
           {activeTab === "details" ? (
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-140px)]">
               {!activeListId && (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -155,6 +201,94 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
                   className="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all resize-none"
                 />
               </div>
+
+              {/* ✅ SECCIÓN 1: ASIGNAR RESPONSABLE */}
+              {workspaceId && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                    <UserPlus className="w-4 h-4 text-cyan-400" />
+                    Asignar Responsable Principal
+                  </label>
+                  <select
+                    value={assigneeId || ""}
+                    onChange={(e) => setAssigneeId(e.target.value || null)}
+                    className="w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Sin asignar</option>
+                    {workspaceMembers.map((m: any) => {
+                      const user = m.user || m;
+                      return (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.email}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {assigneeId && (
+                    <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Responsable asignado correctamente
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ✅ SECCIÓN 2: INVITAR COLABORADORES */}
+              {workspaceId && workspaceMembers.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-400" />
+                    Invitar Colaboradores a la Tarea
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={inviteMemberId}
+                      onChange={(e) => setInviteMemberId(e.target.value)}
+                      className="flex-1 px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Seleccionar usuario...</option>
+                      {workspaceMembers
+                        .filter((m: any) => {
+                          const userId = m.user?.id || m.id;
+                          return userId !== assigneeId;
+                        })
+                        .map((m: any) => {
+                          const user = m.user || m;
+                          return (
+                            <option key={user.id} value={user.id}>
+                              {user.name || user.email}
+                            </option>
+                          );
+                        })}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleInviteMember}
+                      disabled={!inviteMemberId || !initialData?.id}
+                      className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all font-medium flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Invitar
+                    </button>
+                  </div>
+                  {invitedMembers.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-slate-400">Colaboradores invitados:</p>
+                      {invitedMembers.map((member: any) => (
+                        <div key={member.id} className="flex items-center gap-2 text-xs text-slate-300">
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>{member.name || member.email}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!initialData?.id && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Guarda la tarea primero para poder invitar colaboradores.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Estado y Prioridad */}
               <div className="grid grid-cols-2 gap-4">
@@ -235,8 +369,18 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId }: Task
               </div>
             </form>
           ) : (
+            /* ✅ PESTAÑA ACTIVIDAD - CORREGIDO: Pasar workspaceId */
             <div className="h-full overflow-y-auto p-6">
-              <ActivityTab taskId={initialData.id} />
+              {initialData?.id ? (
+                <ActivityTab 
+                  taskId={initialData.id} 
+                  workspaceId={workspaceId || ""}
+                />
+              ) : (
+                <p className="text-center text-slate-500 text-sm py-8">
+                  Guarda la tarea primero para ver la actividad y el chat.
+                </p>
+              )}
             </div>
           )}
         </div>

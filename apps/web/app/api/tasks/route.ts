@@ -1,3 +1,4 @@
+// apps/web/app/api/tasks/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
@@ -12,16 +13,57 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const listId = searchParams.get("listId");
+    const workspaceId = searchParams.get("workspaceId");
+    const assigneeId = searchParams.get("assigneeId");
+    const parentId = searchParams.get("parentId");
 
-    if (!listId) {
-      return NextResponse.json({ error: "listId es requerido" }, { status: 400 });
+    // Construir el where clause dinámicamente
+    const whereClause: any = {};
+
+    if (listId && listId !== "placeholder") {
+      whereClause.listId = listId;
+    }
+
+    if (workspaceId) {
+      whereClause.workspaceId = workspaceId;
+    }
+
+    if (assigneeId) {
+      whereClause.assigneeId = assigneeId;
+    }
+
+    if (parentId) {
+      whereClause.parentId = parentId;
+    }
+
+    // Si no hay ningún filtro, retornar vacío o tareas del workspace del usuario
+    if (Object.keys(whereClause).length === 0) {
+      // Obtener workspaces del usuario
+      const memberships = await prisma.workspaceMember.findMany({
+        where: { userId: session.user.id },
+        select: { workspaceId: true },
+      });
+
+      const workspaceIds = memberships.map((m) => m.workspaceId);
+      
+      if (workspaceIds.length === 0) {
+        return NextResponse.json([]);
+      }
+
+      whereClause.workspaceId = { in: workspaceIds };
     }
 
     const allTasks = await prisma.task.findMany({
-      where: { listId },
+      where: whereClause,
       include: {
         assignee: true,
         creator: true,
+        list: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -41,7 +83,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    let { title, listId, workspaceId, status, priority, dueDate, description, parentId, parentTaskId } = body;
+    let { title, listId, workspaceId, status, priority, dueDate, description, parentId, parentTaskId, assigneeId } = body;
 
     const resolvedParentId = parentId || parentTaskId || null;
 
@@ -60,7 +102,6 @@ export async function POST(request: Request) {
       workspaceId = list.workspaceId;
     }
 
-    // ✅ CORRECCIÓN: Generar un identifier único usando UUID para evitar colisiones por concurrencia
     const uniqueSuffix = randomUUID().split('-')[0].toUpperCase();
     const identifier = `TASK-${uniqueSuffix}`;
 
@@ -75,7 +116,8 @@ export async function POST(request: Request) {
         description: description || null,
         parentId: resolvedParentId,
         creatorId: session.user.id,
-        identifier, // ✅ Ahora es 100% único
+        assigneeId: assigneeId || null,
+        identifier,
         customAttributes: {}
       },
       include: {
@@ -99,7 +141,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, title, status, priority, dueDate, description, parentId, parentTaskId } = body;
+    const { id, title, status, priority, dueDate, description, parentId, parentTaskId, assigneeId } = body;
 
     const resolvedParentId = parentId || parentTaskId;
 
@@ -116,6 +158,7 @@ export async function PUT(request: Request) {
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
         ...(description !== undefined && { description }),
         ...(resolvedParentId !== undefined && { parentId: resolvedParentId }),
+        ...(assigneeId !== undefined && { assigneeId }),
       },
       include: {
         assignee: true,

@@ -1,6 +1,5 @@
 // apps/web/app/page.tsx
 "use client";
-
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -11,10 +10,9 @@ import {
   Layers, Sparkles, RefreshCw, Plus, Building2, AlertTriangle, Users,
   FolderKanban, CheckSquare, Clock, ArrowRight, Folder
 } from "lucide-react";
-
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePresence } from "@/hooks/usePresence";
-import { useUnreadMessages } from "@/hooks/useUnreadMessages"; // ✅ NUEVO IMPORT
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import { ClickUpSidebar } from "@/components/ClickUpSidebar";
 import { TaskModal } from "@/components/TaskModal";
 import { KanbanBoard } from "@/components/KanbanBoard";
@@ -31,22 +29,22 @@ export default function HomePage() {
   const dashboard = useDashboard();
 
   usePresence();
-  
+
   // ✅ Hook de mensajes no leídos global para mostrar badge en el header
-  const { totalUnread } = useUnreadMessages(dashboard.workspaceId);
+  const { totalUnread, markAllAsRead } = useUnreadMessages(dashboard.workspaceId);
 
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
-  
+
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [newSpaceName, setNewSpaceName] = useState("");
   const [selectedSpaceForTask, setSelectedSpaceForTask] = useState<string>("");
   const [selectedSpaceForFolder, setSelectedSpaceForFolder] = useState<string>("");
   const [newFolderName, setNewFolderName] = useState("");
-  
+
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
@@ -60,7 +58,7 @@ export default function HomePage() {
 
   const hasWorkspace = dashboard.workspaceId !== null;
 
-  const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity || 
+  const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity ||
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
 
   useEffect(() => {
@@ -258,7 +256,7 @@ export default function HomePage() {
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
-    
+
     setIsCreatingFolder(true);
     try {
       if (!dashboard.workspaceId) {
@@ -277,7 +275,7 @@ export default function HomePage() {
       let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
 
       if (!targetSpaceId) {
-        alert("⚠️ Error: No se pudo identificar un espacio válido.");
+        alert("️ Error: No se pudo identificar un espacio válido.");
         setIsCreatingFolder(false);
         return;
       }
@@ -285,24 +283,24 @@ export default function HomePage() {
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          name: newFolderName.trim(), 
-          spaceId: targetSpaceId, 
-          workspaceId: dashboard.workspaceId 
+        body: JSON.stringify({
+          name: newFolderName.trim(),
+          spaceId: targetSpaceId,
+          workspaceId: dashboard.workspaceId
         })
       });
 
       if (res.ok) {
         await dashboard.fetchHierarchy();
         setSidebarRefreshKey(prev => prev + 1);
-        
+
         setIsCreateFolderModalOpen(false);
         setNewFolderName("");
         setSelectedSpaceForFolder("");
         alert("✅ Carpeta creada exitosamente");
       } else {
         const err = await res.json();
-        alert(`❌ Error: ${err.error || "No se pudo crear"}`);
+        alert(` Error: ${err.error || "No se pudo crear"}`);
       }
     } catch (error) {
       console.error("Error creando carpeta:", error);
@@ -330,25 +328,25 @@ export default function HomePage() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
-      
+
       {/* HEADER */}
       <header className="h-auto min-h-[56px] bg-slate-900/85 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] px-3 py-2">
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
-          
+
           {/* Lado izquierdo */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button 
-              onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)} 
+            <button
+              onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)}
               className="md:hidden p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors flex items-center justify-center"
             >
               <Menu className="w-5 h-5" />
             </button>
-            
-            <div 
+
+            <div
               onClick={() => {
                 if (dashboard.selectedList) dashboard.setSelectedList(null);
                 router.push("/");
-              }} 
+              }}
               className="flex items-center gap-2 group cursor-pointer"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
@@ -364,10 +362,10 @@ export default function HomePage() {
 
           {/* Lado derecho */}
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
-            
+
             {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
-              <Link 
-                href="/admin2" 
+              <Link
+                href="/admin2"
                 className="flex items-center justify-center px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-xs font-semibold text-cyan-400 gap-1.5"
                 title="Administrador"
               >
@@ -375,10 +373,10 @@ export default function HomePage() {
                 <span className="hidden sm:inline">Admin</span>
               </Link>
             )}
-            
+
             {(session?.user as any)?.role === 'superadmin' && (
-              <Link 
-                href="/admin" 
+              <Link
+                href="/admin"
                 className="flex items-center justify-center px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-semibold text-amber-400 gap-1.5"
                 title="Super Admin"
               >
@@ -422,14 +420,15 @@ export default function HomePage() {
 
             {/* ✅ ENLACE A PÁGINA DE USUARIOS CON BADGE DE NOTIFICACIÓN GLOBAL */}
             {dashboard.workspaceId && (
-              <Link 
+              <Link
                 href={`/workspace/${dashboard.workspaceId}/users`}
+                onClick={() => markAllAsRead()}
                 className="relative flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
                 title="Ver usuarios"
               >
                 <Users className="w-4 h-4 text-cyan-400" />
                 <span className="hidden sm:inline">Usuarios</span>
-                
+
                 {/* Badge de mensajes no leídos */}
                 {totalUnread > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center animate-pulse border-2 border-slate-900">
@@ -440,11 +439,23 @@ export default function HomePage() {
                 )}
               </Link>
             )}
-            
+
+            {/* ✅ NUEVO: ENLACE A PÁGINA DE ASIGNACIONES */}
+            {dashboard.workspaceId && (
+              <Link
+                href={`/workspace/${dashboard.workspaceId}/assigned-users`}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
+                title="Ver asignaciones de tareas"
+              >
+                <FolderKanban className="w-4 h-4 text-purple-400" />
+                <span className="hidden sm:inline">Asignaciones</span>
+              </Link>
+            )}
+
             {/* Menú de Perfil */}
             <div className="relative" ref={profileMenuRef}>
-              <button 
-                onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)} 
+              <button
+                onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)}
                 className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-slate-800/60 transition-all border border-slate-800"
               >
                 <div className="w-7 h-7 rounded bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -452,7 +463,7 @@ export default function HomePage() {
                 </div>
                 <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
               </button>
-              
+
               {dashboard.isProfileMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => dashboard.setIsProfileMenuOpen(false)}></div>
@@ -481,29 +492,29 @@ export default function HomePage() {
 
       <div className="flex flex-1 overflow-hidden relative">
         {dashboard.isSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity" 
-            onClick={() => dashboard.setIsSidebarOpen(false)} 
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-20 md:hidden transition-opacity"
+            onClick={() => dashboard.setIsSidebarOpen(false)}
           />
         )}
-        
-        <aside 
+
+        <aside
           className={`
-            absolute md:relative z-30 h-full w-72 flex-shrink-0 
-            bg-slate-900/95 md:bg-slate-900/40 
-            border-r border-slate-800/80 backdrop-blur-2xl 
-            transition-transform duration-300 ease-in-out 
+            absolute md:relative z-30 h-full w-72 flex-shrink-0
+            bg-slate-900/95 md:bg-slate-900/40
+            border-r border-slate-800/80 backdrop-blur-2xl
+            transition-transform duration-300 ease-in-out
             flex flex-col overflow-hidden
             ${dashboard.isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
           `}
         >
           <div className="flex-1 overflow-y-auto">
-            <ClickUpSidebar 
+            <ClickUpSidebar
               key={sidebarRefreshKey}
-              workspaceId={dashboard.workspaceId || ""} 
+              workspaceId={dashboard.workspaceId || ""}
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
-              onSelectList={dashboard.handleListSelect} 
-              onOpenFolderModal={dashboard.handleOpenFolderModal} 
+              onSelectList={dashboard.handleListSelect}
+              onOpenFolderModal={dashboard.handleOpenFolderModal}
             />
           </div>
           <div className="p-3 pt-2 flex-shrink-0 border-t border-slate-800/60 bg-slate-950/20">
@@ -546,7 +557,7 @@ export default function HomePage() {
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="mt-3 pt-3 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 relative z-10">
                   <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
                     <div className="relative flex-1 max-w-sm">
@@ -781,7 +792,16 @@ export default function HomePage() {
         </main>
       </div>
 
-      <TaskModal isOpen={dashboard.isModalOpen} onClose={() => dashboard.setIsModalOpen(false)} onSave={dashboard.handleSaveWithParent} initialData={dashboard.editingTask} listId={dashboard.selectedList?.id || ""} />
+      {/* ✅ CORREGIDO: Se agregó la prop workspaceId para que TaskModal pueda pasarla a ActivityTab */}
+      <TaskModal 
+        isOpen={dashboard.isModalOpen} 
+        onClose={() => dashboard.setIsModalOpen(false)} 
+        onSave={dashboard.handleSaveWithParent} 
+        initialData={dashboard.editingTask} 
+        listId={dashboard.selectedList?.id || ""} 
+        workspaceId={dashboard.workspaceId || ""} 
+      />
+      
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
 
       {isCreateWorkspaceModalOpen && (
