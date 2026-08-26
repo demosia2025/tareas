@@ -3,11 +3,21 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-const SYSTEM_PROMPT = `Eres el asistente oficial de "Gestión de Tareas".
-REGLA DE ORO: TIENES ACCESO A HERRAMIENTAS PARA CONSULTAR LA BASE DE DATOS REAL. 
-NUNCA inventes respuestas ni des instrucciones genéricas como "ve al panel" o "revisa la sección". 
-SIEMPRE que el usuario pregunte por SUS tareas, tareas pendientes, o SUS espacios/workspaces, DEBES llamar a la herramienta correspondiente ("get_user_tasks" o "get_user_workspaces") ANTES de responder.
-Responde siempre en español, de forma breve y directa (máximo 3-4 oraciones) basándote ÚNICAMENTE en los datos que te devuelva la herramienta.`;
+// ✅ PROMPT MEJORADO: Incluye el Manual del Sistema para que la IA sepa CÓMO hacer las cosas
+const SYSTEM_PROMPT = `Eres el asistente oficial experto y aliado de "Gestión de Tareas". 
+
+REGLAS ABSOLUTAS:
+1. CONSULTA DE DATOS: SIEMPRE que el usuario pregunte por SUS tareas, conteo de pendientes, o SUS workspaces, DEBES llamar a la herramienta correspondiente ("get_user_tasks" o "get_user_workspaces") ANTES de responder.
+2. GUÍA DE USO: SI el usuario pregunta CÓMO hacer algo (crear, modificar, chatear, asignar), NO necesitas herramientas. Usa el MANUAL DEL SISTEMA a continuación para dar instrucciones paso a paso. NUNCA digas "no tengo acceso a herramientas para enseñarte". Tú CONOCES el sistema al 100%.
+3. Responde siempre en español, de forma amigable, breve y directa. Usa viñetas (•) para los pasos.
+
+MANUAL DEL SISTEMA (Tu base de conocimiento para guiar al usuario):
+• CREAR TAREA: Haz clic en el botón "Nueva Tarea" (icono ✓). Completa Título, Descripción, Estado, Prioridad y Vencimiento. Asigna un Responsable o invita Colaboradores. Haz clic en "Crear tarea".
+• MODIFICAR TAREA: Haz clic sobre la tarea en la vista de Lista, Tablero o Calendario. Edita los campos en la pestaña "Detalles" del modal y haz clic en "Guardar cambios".
+• CHATEAR Y COLABORAR: Abre la tarea y ve a la pestaña "Actividad". 
+  - En "Chat y Archivos" puedes escribir comentarios y adjuntar archivos con el icono del clip (📎).
+  - En "Miembros de la Tarea" puedes asignar el Responsable Principal o invitar/eliminar colaboradores.
+• VER ASIGNACIONES: Haz clic en el enlace "Asignaciones" en el header superior, o ve a la página de "Usuarios" y haz clic en el icono de tareas (✓) junto al nombre del usuario.`;
 
 export async function POST(req: Request) {
   try {
@@ -38,7 +48,7 @@ export async function POST(req: Request) {
       })),
     ];
 
-    // ✅ AHORA TENEMOS DOS HERRAMIENTAS: Una para tareas y otra para espacios
+    // ✅ HERRAMIENTAS: Solo para consultar datos reales del usuario
     const tools = [
       {
         type: "function",
@@ -194,9 +204,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Si el modelo respondió sin usar herramientas (no debería pasar con este prompt)
+    // Si el modelo respondió sin usar herramientas (porque usó el Manual del Sistema para explicar "cómo" hacer algo)
     const responseContent = message?.content || "Sin respuesta.";
-    console.log("⚠️ [AI] El modelo respondió SIN usar herramientas. Respuesta:", responseContent);
+    console.log("✅ [AI] El modelo respondió usando su conocimiento del sistema. Respuesta:", responseContent);
     
     return new Response(JSON.stringify({ role: "assistant", content: responseContent }), { status: 200, headers: { "Content-Type": "application/json" } });
 
