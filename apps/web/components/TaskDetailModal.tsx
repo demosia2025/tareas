@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Send, Paperclip, X, FileText, Check, Users, MessageSquare, UserPlus, Plus, Circle, ChevronRight, ArrowLeft, Clock, Trash2 } from "lucide-react";
 import AssigneeSelector from "@/components/AssigneeSelector";
-import { ActivityTab } from "@/components/ActivityTab"; // 👈 Importado correctamente
+import { ActivityTab } from "@/components/ActivityTab";
 
 interface TaskDetailModalProps {
   taskId: string;
@@ -24,6 +25,7 @@ interface TaskMember {
 }
 
 export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModalProps) {
+  const router = useRouter();
   const [taskStack, setTaskStack] = useState<{ id: string; title: string; listId?: string }[]>([]);
   const currentTask = taskStack.length > 0 ? taskStack[taskStack.length - 1] : { id: taskId, title: "Cargando..." };
   const [activeTab, setActiveTab] = useState<"details" | "subtasks" | "activity">("details");
@@ -43,6 +45,44 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
   const [selectedUserId, setSelectedUserId] = useState("");
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
 
+  // ✅ FUNCIÓN MEJORADA PARA CERRAR Y REDIRIGIR
+  const handleClose = async () => {
+    console.log("🚀 [DEBUG] Cerrando modal. workspaceId:", workspaceId, "listId:", listId, "currentTask.listId:", currentTask.listId);
+    
+    // Cerrar el modal primero
+    onClose();
+    
+    // Determinar qué listId usar
+    const targetListId = listId || currentTask.listId;
+    
+    if (workspaceId && targetListId) {
+      console.log("✅ [DEBUG] Redirigiendo a la lista:", targetListId);
+      router.push(`/?listId=${targetListId}`);
+    } else if (workspaceId) {
+      // Si no hay listId, intentar obtenerlo de la tarea
+      console.log("⚠️ [DEBUG] No hay listId disponible, intentando obtener de la API...");
+      try {
+        const res = await fetch(`/api/tasks?workspaceId=${workspaceId}`);
+        if (res.ok) {
+          const tasks = await res.json();
+          const task = tasks.find((t: any) => t.id === taskId || t.id === currentTask.id);
+          if (task?.listId) {
+            console.log("✅ [DEBUG] listId encontrado en API:", task.listId);
+            router.push(`/?listId=${task.listId}`);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error obteniendo listId:", error);
+      }
+      // Si todo falla, ir al workspace
+      console.warn("⚠️ [DEBUG] No se pudo obtener listId, redirigiendo al workspace");
+      router.push(`/workspace/${workspaceId}`);
+    } else {
+      router.push(`/`);
+    }
+  };
+
   useEffect(() => {
     if (currentTask.id) {
       fetchData(currentTask.id);
@@ -60,7 +100,21 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
         setComments(data.comments || []);
         setAttachments(data.attachments || []);
         if (data.task) {
-          if (data.task.listId) setListId(data.task.listId);
+          console.log("💾 [DEBUG] Datos de tarea recibidos:", data.task);
+          if (data.task.listId) {
+            console.log("✅ [DEBUG] listId encontrado:", data.task.listId);
+            setListId(data.task.listId);
+            // Actualizar el taskStack con el listId
+            setTaskStack(prev => {
+              const updated = [...prev];
+              if (updated.length > 0 && updated[updated.length - 1].id === targetTaskId) {
+                updated[updated.length - 1].listId = data.task.listId;
+              }
+              return updated;
+            });
+          } else {
+            console.warn("⚠️ [DEBUG] data.task.listId es null o undefined");
+          }
           if (data.task.assigneeId) setCurrentAssigneeId(data.task.assigneeId);
           if (taskStack.length === 0) {
             setTaskStack([{ id: targetTaskId, title: data.task.title, listId: data.task.listId }]);
@@ -209,7 +263,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl h-[88vh] flex flex-col shadow-2xl overflow-hidden text-slate-200">
-        {/* Cabecera y Navegación */}
         <div className="px-6 pt-4 border-b border-slate-800 flex flex-col gap-2">
           {taskStack.length > 1 && (
             <button
@@ -222,7 +275,7 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
           )}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white truncate max-w-lg">{currentTask.title}</h3>
-            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+            <button onClick={handleClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -251,13 +304,11 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
           </div>
         </div>
 
-        {/* Contenido Dinámico por Pestañas */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center h-full text-xs text-slate-400">Cargando información...</div>
           ) : activeTab === "details" ? (
             <div className="space-y-6">
-              {/* SECCIÓN 1: ASIGNAR RESPONSABLE PRINCIPAL */}
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
                   <UserPlus className="w-4 h-4 text-cyan-400" />
@@ -276,7 +327,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                 </div>
               </div>
 
-              {/* SECCIÓN 2: INVITAR COLABORADORES A LA TAREA */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -370,7 +420,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                 )}
               </div>
 
-              {/* Invitación de Usuarios al Workspace */}
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
                 <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
                   <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
@@ -390,7 +439,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                 </form>
               </div>
 
-              {/* Lista de Miembros del Workspace */}
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Miembros de la Organización</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -457,7 +505,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
               </div>
             </div>
           ) : (
-            /* 👈 SECCIÓN DE ACTIVIDAD INTEGRADA CORRECTAMENTE CON ActivityTab */
             <ActivityTab 
               taskId={currentTask.id} 
               workspaceId={workspaceId} 

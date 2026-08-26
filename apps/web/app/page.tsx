@@ -30,7 +30,6 @@ export default function HomePage() {
 
   usePresence();
 
-  // ✅ Hook de mensajes no leídos global para mostrar badge en el header
   const { totalUnread, markAllAsRead } = useUnreadMessages(dashboard.workspaceId);
 
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
@@ -67,12 +66,13 @@ export default function HomePage() {
     }
   }, [status, router]);
 
-  // ✅ CORREGIDO: Detectar si debemos abrir una tarea específica desde la URL.
-  // Usamos window.location.search en lugar de useSearchParams para evitar el error de build en Vercel.
+  // ✅ USEFFECT MEJORADO PARA MANEJAR APERTURA DE TAREAS Y LISTAS DESDE URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const openTaskId = params.get("openTask");
+    const urlListId = params.get("listId");
     
+    // 1. Si hay una tarea específica para abrir desde la URL
     if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
       const fetchAndOpenTask = async () => {
         try {
@@ -82,14 +82,14 @@ export default function HomePage() {
             const taskToOpen = tasks.find((t: any) => t.id === openTaskId);
             
             if (taskToOpen) {
+              // Abrimos el modal inmediatamente
               if (dashboard.openEditModal) {
                 dashboard.openEditModal(taskToOpen);
               } else {
-                // Fallback por si el hook usa nombres de funciones diferentes
                 (dashboard as any).setEditingTask?.(taskToOpen);
                 (dashboard as any).setIsModalOpen?.(true);
               }
-              // Limpiar el parámetro de la URL sin recargar la página
+              // Limpiamos la URL para que no se vuelva a abrir al recargar
               window.history.replaceState({}, "", "/");
             }
           }
@@ -97,10 +97,34 @@ export default function HomePage() {
           console.error("Error al abrir la tarea desde la URL:", error);
         }
       };
-      
       fetchAndOpenTask();
+    } 
+    // 2. Si hay un listId en la URL (ej. redirección externa)
+    else if (urlListId && dashboard.spaces && dashboard.spaces.length > 0) {
+      let foundList = null;
+      let foundSpace = null;
+      
+      for (const space of dashboard.spaces) {
+        if (space.lists) {
+          const list = space.lists.find((l: any) => l.id === urlListId);
+          if (list) {
+            foundList = list;
+            foundSpace = space;
+            break;
+          }
+        }
+      }
+
+      if (foundList && foundSpace) {
+        if (!dashboard.selectedList || dashboard.selectedList.id !== foundList.id) {
+          dashboard.handleListSelect({ id: foundList.id, name: foundList.name, spaceId: foundSpace.id });
+        }
+        window.history.replaceState({}, "", "/");
+      } else {
+        window.history.replaceState({}, "", "/");
+      }
     }
-  }, [dashboard.isModalOpen, dashboard.workspaceId]);
+  }, [dashboard.isModalOpen, dashboard.workspaceId, dashboard.selectedList, dashboard.spaces]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -420,7 +444,6 @@ export default function HomePage() {
               </Link>
             )}
 
-            {/* Selector de Workspace */}
             {dashboard.memberships && dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef} className="w-[130px] sm:w-[180px]">
                 <WorkspaceSelector
@@ -453,7 +476,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* ✅ ENLACE A PÁGINA DE USUARIOS CON BADGE DE NOTIFICACIÓN GLOBAL */}
             {dashboard.workspaceId && (
               <Link
                 href={`/workspace/${dashboard.workspaceId}/users`}
@@ -463,8 +485,6 @@ export default function HomePage() {
               >
                 <Users className="w-4 h-4 text-cyan-400" />
                 <span className="hidden sm:inline">Usuarios</span>
-
-                {/* Badge de mensajes no leídos */}
                 {totalUnread > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center animate-pulse border-2 border-slate-900">
                     <span className="text-[10px] font-bold text-white">
@@ -475,7 +495,6 @@ export default function HomePage() {
               </Link>
             )}
 
-            {/* ✅ NUEVO: ENLACE A PÁGINA DE ASIGNACIONES */}
             {dashboard.workspaceId && (
               <Link
                 href={`/workspace/${dashboard.workspaceId}/assigned-users`}
@@ -487,7 +506,6 @@ export default function HomePage() {
               </Link>
             )}
 
-            {/* Menú de Perfil */}
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)}
@@ -827,10 +845,27 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* ✅ CORREGIDO: Se agregó la prop workspaceId para que TaskModal pueda pasarla a ActivityTab */}
+      {/* ✅ CORREGIDO: onClose ahora selecciona la lista de la tarea antes de cerrar */}
       <TaskModal 
         isOpen={dashboard.isModalOpen} 
-        onClose={() => dashboard.setIsModalOpen(false)} 
+        onClose={() => {
+          // ✅ SOLUCIÓN CLAVE: Al cerrar el modal, si la tarea tiene una lista, la seleccionamos.
+          // Esto evita que el usuario quede atrapado en la pantalla de inicio ("¿Qué quieres hacer hoy?")
+          const taskListId = dashboard.editingTask?.listId;
+          
+          if (taskListId && !dashboard.selectedList && dashboard.spaces) {
+            for (const space of dashboard.spaces) {
+              if (space.lists) {
+                const list = space.lists.find((l: any) => l.id === taskListId);
+                if (list) {
+                  dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
+                  break;
+                }
+              }
+            }
+          }
+          dashboard.setIsModalOpen(false);
+        }} 
         onSave={dashboard.handleSaveWithParent} 
         initialData={dashboard.editingTask} 
         listId={dashboard.selectedList?.id || ""} 
