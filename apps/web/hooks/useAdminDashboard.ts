@@ -5,38 +5,34 @@ import { useRouter } from "next/navigation";
 export function useAdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState({ totalUsers: 0, totalWorkspaces: 0, totalTasks: 0, totalMembers: 0 });
-
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [inviteCodes, setInviteCodes] = useState<any[]>([]);
   const [invitations, setInvitations] = useState<any[]>([]);
-  
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [orgStats, setOrgStats] = useState<any[]>([]);
   const [workspaceStats, setWorkspaceStats] = useState<any[]>([]);
-
   const [searchWorkspaces, setSearchWorkspaces] = useState("");
   const [searchSpaces, setSearchSpaces] = useState("");
   const [searchOrgs, setSearchOrgs] = useState("");
   const [searchUsers, setSearchUsers] = useState("");
   const [searchInvitations, setSearchInvitations] = useState("");
   const [searchCodes, setSearchCodes] = useState("");
-
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [joinForm, setJoinForm] = useState({ inviteCode: "", workspaceSlug: "" });
-
   const [activeTab, setActiveTab] = useState<"overview" | "workspaces" | "spaces" | "organizations" | "users" | "invitations" | "invite-codes">("overview");
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [createUserForm, setCreateUserForm] = useState({ name: "", email: "", password: "", role: "user", organizationId: "", workspaceId: "" });
-  const [editForm, setEditForm] = useState({ role: "user", password: "" });
+  
+  // ✅ CORREGIDO: Agregados name y email al editForm
+  const [editForm, setEditForm] = useState({ name: "", email: "", role: "user", password: "" });
 
   const fetchData = async () => {
     try {
@@ -46,49 +42,41 @@ export function useAdminDashboard() {
         fetch("/api/admin/spaces"),
         fetch("/api/admin/organizations"),
         fetch("/api/admin/users"),
-        fetch("/api/admin2/invite-codes"),
+        fetch("/api/admin/invite-codes"),
         fetch("/api/admin/invitations").catch(() => ({ ok: false, json: () => Promise.resolve({}) })),
         fetch("/api/admin/organizations/plan").catch(() => ({ ok: false, json: () => Promise.resolve(null) } as unknown as Response))
       ]);
 
       if (statsRes.ok) setStats(await statsRes.json());
-      
       if (wsRes.ok) {
         const wsData = await wsRes.json();
         const wsArray = Array.isArray(wsData) ? wsData : (wsData.workspaces || []);
         setWorkspaces(wsArray);
         setWorkspaceStats(wsArray);
       }
-      
       if (spRes.ok) {
         const spData = await spRes.json();
         setSpaces(Array.isArray(spData) ? spData : (spData.spaces || []));
       }
-      
       if (orgRes.ok) {
         const orgData = await orgRes.json();
         const orgArray = Array.isArray(orgData) ? orgData : (orgData.organizations || []);
         setOrganizations(orgArray);
         setOrgStats(orgArray);
       }
-      
       if (uRes.ok) {
         const uData = await uRes.json();
         setUsers(Array.isArray(uData) ? uData : (uData.users || []));
       }
-      
       if (icRes.ok) {
         const icData = await icRes.json();
         setInviteCodes(Array.isArray(icData) ? icData : (icData.inviteCodes || icData.codes || []));
       }
-      
       if (invRes.ok) {
         const invData = await invRes.json();
         setInvitations(Array.isArray(invData) ? invData : (invData.invitations || []));
       }
-      
       if (planRes.ok) setPlanInfo(await planRes.json());
-      
     } catch (error) {
       console.error("Error fetching admin data:", error);
     }
@@ -114,7 +102,10 @@ export function useAdminDashboard() {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session?.user) { router.push("/login"); return; }
+    if (!session?.user) {
+      router.push("/login");
+      return;
+    }
     checkAdminAccess();
   }, [status, session, router]);
 
@@ -126,7 +117,6 @@ export function useAdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(createUserForm),
       });
-      
       if (response.ok) {
         fetchData();
         setIsCreateUserOpen(false);
@@ -135,9 +125,47 @@ export function useAdminDashboard() {
         const err = await response.json();
         alert(err.error || "Error al crear usuario");
       }
-    } catch (error) { 
-      console.error(error); 
+    } catch (error) {
+      console.error(error);
       alert("Error al crear usuario");
+    }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Actualizar usuario (incluye name y email)
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    try {
+      const body: any = { 
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role 
+      };
+      
+      // Solo incluir password si se proporcionó una nueva
+      if (editForm.password && editForm.password.trim() !== "") {
+        body.password = editForm.password;
+      }
+      
+      const res = await fetch(`/api/admin/users?id=${editingUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      
+      if (res.ok) {
+        await fetchData();
+        setEditingUser(null);
+        setEditForm({ name: "", email: "", role: "user", password: "" });
+        alert("✅ Usuario actualizado correctamente");
+      } else {
+        const err = await res.json();
+        alert(`❌ Error: ${err.error || "No se pudo actualizar el usuario"}`);
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
+      alert("❌ Error de conexión");
     }
   };
 
@@ -146,7 +174,9 @@ export function useAdminDashboard() {
     try {
       await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
       fetchData();
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleJoinWorkspace = async (e: React.FormEvent) => {
@@ -157,7 +187,6 @@ export function useAdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(joinForm),
       });
-      
       if (response.ok) {
         setIsJoinModalOpen(false);
         setJoinForm({ inviteCode: "", workspaceSlug: "" });
@@ -173,33 +202,33 @@ export function useAdminDashboard() {
     }
   };
 
-  const filteredWorkspaces = useMemo(() => 
-    (Array.isArray(workspaces) ? workspaces : []).filter(w => w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) || w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())), 
+  const filteredWorkspaces = useMemo(() =>
+    (Array.isArray(workspaces) ? workspaces : []).filter(w => w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) || w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())),
     [workspaces, searchWorkspaces]
   );
-  
-  const filteredSpaces = useMemo(() => 
-    (Array.isArray(spaces) ? spaces : []).filter(s => s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) || s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())), 
+
+  const filteredSpaces = useMemo(() =>
+    (Array.isArray(spaces) ? spaces : []).filter(s => s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) || s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())),
     [spaces, searchSpaces]
   );
-  
-  const filteredOrgs = useMemo(() => 
-    (Array.isArray(organizations) ? organizations : []).filter(o => o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) || o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())), 
+
+  const filteredOrgs = useMemo(() =>
+    (Array.isArray(organizations) ? organizations : []).filter(o => o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) || o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())),
     [organizations, searchOrgs]
   );
-  
-  const filteredUsers = useMemo(() => 
-    (Array.isArray(users) ? users : []).filter(u => u.name?.toLowerCase().includes(searchUsers.toLowerCase()) || u.email?.toLowerCase().includes(searchUsers.toLowerCase())), 
+
+  const filteredUsers = useMemo(() =>
+    (Array.isArray(users) ? users : []).filter(u => u.name?.toLowerCase().includes(searchUsers.toLowerCase()) || u.email?.toLowerCase().includes(searchUsers.toLowerCase())),
     [users, searchUsers]
   );
-  
-  const filteredInvitations = useMemo(() => 
-    (Array.isArray(invitations) ? invitations : []).filter(i => i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) || i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())), 
+
+  const filteredInvitations = useMemo(() =>
+    (Array.isArray(invitations) ? invitations : []).filter(i => i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) || i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())),
     [invitations, searchInvitations]
   );
-  
-  const filteredCodes = useMemo(() => 
-    (Array.isArray(inviteCodes) ? inviteCodes : []).filter(c => c.code?.toLowerCase().includes(searchCodes.toLowerCase()) || c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())), 
+
+  const filteredCodes = useMemo(() =>
+    (Array.isArray(inviteCodes) ? inviteCodes : []).filter(c => c.code?.toLowerCase().includes(searchCodes.toLowerCase()) || c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())),
     [inviteCodes, searchCodes]
   );
 
@@ -212,13 +241,11 @@ export function useAdminDashboard() {
     searchInvitations, setSearchInvitations, searchCodes, setSearchCodes,
     isCreateUserOpen, setIsCreateUserOpen, editingUser, setEditingUser,
     createUserForm, setCreateUserForm, editForm, setEditForm,
-    handleCreateUser, handleDeleteUser, fetchData,
+    handleCreateUser, handleUpdateUser, handleDeleteUser, fetchData,
     isProfileMenuOpen, setIsProfileMenuOpen,
     isJoinModalOpen, setIsJoinModalOpen,
     joinForm, setJoinForm,
     handleJoinWorkspace,
-    planInfo,
-    orgStats,
-    workspaceStats
+    planInfo, orgStats, workspaceStats
   };
 }

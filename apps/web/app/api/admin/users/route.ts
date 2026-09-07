@@ -1,44 +1,68 @@
-import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { checkUserLimit } from "@/lib/authorization";
 import bcrypt from "bcryptjs";
 
-export async function GET(request: Request) {
+// ✅ OBTENER TODOS LOS USUARIOS
+export async function GET() {
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-    if (user?.role !== "admin" && user?.role !== "superadmin") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
     const users = await prisma.user.findMany({
-      include: {
-        _count: { select: { memberships: true, createdTasks: true } }
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        _count: {
+          select: {
+            memberships: true,
+            createdTasks: true
+          }
+        }
       },
       orderBy: { createdAt: "desc" }
     });
 
     return NextResponse.json(users);
   } catch (error: any) {
+    console.error("Error obteniendo usuarios:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
+// ✅ CREAR NUEVO USUARIO
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-    if (user?.role !== "admin" && user?.role !== "superadmin") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
     const body = await request.json();
-    const { name, email, password, role, organizationId, workspaceId } = body;
+    const { name, email, password, role, workspaceId } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Nombre, email y contraseña son requeridos" }, { status: 400 });
@@ -46,97 +70,134 @@ export async function POST(request: Request) {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return NextResponse.json({ error: "El email ya está registrado" }, { status: 400 });
-    }
-
-    if (organizationId) {
-      const limitCheck = await checkUserLimit(organizationId);
-      if (!limitCheck.allowed) {
-        return NextResponse.json({ 
-          error: `Límite de usuarios alcanzado. Tu plan ${limitCheck.plan} permite máximo ${limitCheck.limit === -1 ? 'usuarios ilimitados' : limitCheck.limit} usuarios. Actualmente tienes ${limitCheck.currentCount}.`,
-          needsUpgrade: true
-        }, { status: 403 });
-      }
+      return NextResponse.json({ error: "El email ya está en uso" }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role: role || "user" }
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: role || "user"
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true
+      }
     });
 
+    // Si se proporciona un workspaceId, agregar al usuario como miembro
     if (workspaceId) {
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-      if (workspace) {
-        await prisma.workspaceMember.create({
-          data: {
-            userId: newUser.id,
-            workspaceId: workspaceId,
-            role: "member",
-            organizationId: workspace.organizationId
-          }
-        });
-      }
+      await prisma.workspaceMember.create({
+        data: {
+          userId: newUser.id,
+          workspaceId,
+          role: role === "admin" ? "admin" : "member"
+        }
+      });
     }
 
-    return NextResponse.json({ message: "Usuario creado exitosamente", user: { id: newUser.id, name: newUser.name, email: newUser.email } }, { status: 201 });
+    return NextResponse.json(newUser, { status: 201 });
   } catch (error: any) {
+    console.error("Error creando usuario:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-export async function PUT(request: Request) {
+// ✅ EDITAR USUARIO (El que te estaba fallando)
+export async function PATCH(request: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-    if (user?.role !== "admin" && user?.role !== "superadmin") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "ID de usuario requerido" }, { status: 400 });
+    }
 
     const body = await request.json();
-    let { name, email, password, role } = body;
+    const { name, email, role, password } = body;
 
-    let updateData: any = {};
+    const updateData: any = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (role) updateData.role = role;
+    
+    // Solo hashear la contraseña si se proporciona una nueva
     if (password && password.trim() !== "") {
       updateData.password = await bcrypt.hash(password, 10);
     }
 
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: updateData
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true
+      }
     });
 
     return NextResponse.json(updatedUser);
   } catch (error: any) {
+    console.error("Error actualizando usuario:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
+// ✅ ELIMINAR USUARIO
 export async function DELETE(request: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-    if (user?.role !== "admin" && user?.role !== "superadmin") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "ID de usuario requerido" }, { status: 400 });
+    }
 
-    await prisma.user.delete({ where: { id } });
-    return NextResponse.json({ message: "Usuario eliminado" });
+    // No permitir eliminar al propio usuario que está haciendo la petición
+    if (id === session.user.id) {
+      return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
+    }
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true, message: "Usuario eliminado correctamente" });
   } catch (error: any) {
+    console.error("Error eliminando usuario:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

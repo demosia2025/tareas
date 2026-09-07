@@ -1,4 +1,3 @@
-// apps/web/app/page.tsx
 "use client";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -8,7 +7,7 @@ import {
   Zap, Menu, Shield, User, LogOut, ChevronDown, LayoutDashboard,
   List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal,
   Layers, Sparkles, RefreshCw, Plus, Building2, AlertTriangle, Users,
-  FolderKanban, CheckSquare, Clock, ArrowRight, Folder
+  FolderKanban, CheckSquare, Clock, ArrowRight, Folder, Crown, CheckCircle
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePresence } from "@/hooks/usePresence";
@@ -22,16 +21,22 @@ import { FunctionalCalendarView } from "@/components/FunctionalCalendarView";
 import AIAssistant from "@/components/AIAssistant";
 import WorkspaceSelector from "@/components/WorkspaceSelector";
 import PlanLimitModal from "@/components/PlanLimitModal";
+import DashboardView from "@/components/DashboardView";
+import UsersView from "@/components/UsersView";
+import AssignedView from "@/components/AssignedView";
+import AdminView from "@/components/AdminView";
+import ProfileView from "@/components/ProfileView";
+
+type ActiveView = "home" | "dashboard" | "users" | "assigned" | "admin" | "profile";
 
 export default function HomePage() {
   const { status, data: session } = useSession();
   const router = useRouter();
   const dashboard = useDashboard();
-
   usePresence();
-
   const { totalUnread, markAllAsRead } = useUnreadMessages(dashboard.workspaceId);
 
+  const [activeView, setActiveView] = useState<ActiveView>("home");
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
   const [isCreateWorkspaceModalOpen, setIsCreateWorkspaceModalOpen] = useState(false);
   const [isCreateSpaceModalOpen, setIsCreateSpaceModalOpen] = useState(false);
@@ -56,9 +61,12 @@ export default function HomePage() {
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
   const hasWorkspace = dashboard.workspaceId !== null;
-
   const canCreateWorkspace = dashboard.planInfo?.workspaceLimit === Infinity ||
     (dashboard.planInfo?.workspaceCount || 0) < (dashboard.planInfo?.workspaceLimit || 0);
+
+  const userRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
+  const isSuperAdmin = userRole === "superadmin";
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -66,13 +74,17 @@ export default function HomePage() {
     }
   }, [status, router]);
 
-  // ✅ USEFFECT MEJORADO PARA MANEJAR APERTURA DE TAREAS Y LISTAS DESDE URL
+  useEffect(() => {
+    if (dashboard.selectedList) {
+      setActiveView("dashboard");
+    }
+  }, [dashboard.selectedList]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const openTaskId = params.get("openTask");
     const urlListId = params.get("listId");
     
-    // 1. Si hay una tarea específica para abrir desde la URL
     if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
       const fetchAndOpenTask = async () => {
         try {
@@ -80,16 +92,13 @@ export default function HomePage() {
           if (res.ok) {
             const tasks = await res.json();
             const taskToOpen = tasks.find((t: any) => t.id === openTaskId);
-            
             if (taskToOpen) {
-              // Abrimos el modal inmediatamente
               if (dashboard.openEditModal) {
                 dashboard.openEditModal(taskToOpen);
               } else {
                 (dashboard as any).setEditingTask?.(taskToOpen);
                 (dashboard as any).setIsModalOpen?.(true);
               }
-              // Limpiamos la URL para que no se vuelva a abrir al recargar
               window.history.replaceState({}, "", "/");
             }
           }
@@ -98,12 +107,9 @@ export default function HomePage() {
         }
       };
       fetchAndOpenTask();
-    } 
-    // 2. Si hay un listId en la URL (ej. redirección externa)
-    else if (urlListId && dashboard.spaces && dashboard.spaces.length > 0) {
+    } else if (urlListId && dashboard.spaces && dashboard.spaces.length > 0) {
       let foundList = null;
       let foundSpace = null;
-      
       for (const space of dashboard.spaces) {
         if (space.lists) {
           const list = space.lists.find((l: any) => l.id === urlListId);
@@ -114,7 +120,6 @@ export default function HomePage() {
           }
         }
       }
-
       if (foundList && foundSpace) {
         if (!dashboard.selectedList || dashboard.selectedList.id !== foundList.id) {
           dashboard.handleListSelect({ id: foundList.id, name: foundList.name, spaceId: foundSpace.id });
@@ -315,30 +320,25 @@ export default function HomePage() {
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
-
     setIsCreatingFolder(true);
     try {
       if (!dashboard.workspaceId) {
-        alert("⚠️ Error: No tienes un workspace activo.");
+        alert("️ Error: No tienes un workspace activo.");
         setIsCreatingFolder(false);
         return;
       }
-
       if (!dashboard.spaces || dashboard.spaces.length === 0) {
         alert("⚠️ Debes crear al menos un Espacio primero.");
         setIsCreateFolderModalOpen(false);
         setIsCreatingFolder(false);
         return;
       }
-
       let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
-
       if (!targetSpaceId) {
-        alert("️ Error: No se pudo identificar un espacio válido.");
+        alert("⚠️ Error: No se pudo identificar un espacio válido.");
         setIsCreatingFolder(false);
         return;
       }
-
       const res = await fetch("/api/folders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -348,18 +348,16 @@ export default function HomePage() {
           workspaceId: dashboard.workspaceId
         })
       });
-
       if (res.ok) {
         await dashboard.fetchHierarchy();
         setSidebarRefreshKey(prev => prev + 1);
-
         setIsCreateFolderModalOpen(false);
         setNewFolderName("");
         setSelectedSpaceForFolder("");
         alert("✅ Carpeta creada exitosamente");
       } else {
         const err = await res.json();
-        alert(` Error: ${err.error || "No se pudo crear"}`);
+        alert(`Error: ${err.error || "No se pudo crear"}`);
       }
     } catch (error) {
       console.error("Error creando carpeta:", error);
@@ -387,12 +385,9 @@ export default function HomePage() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white overflow-hidden">
-
       {/* HEADER */}
       <header className="h-auto min-h-[56px] bg-slate-900/85 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999] px-3 py-2">
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
-
-          {/* Lado izquierdo */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => dashboard.setIsSidebarOpen(!dashboard.isSidebarOpen)}
@@ -400,11 +395,10 @@ export default function HomePage() {
             >
               <Menu className="w-5 h-5" />
             </button>
-
             <div
               onClick={() => {
                 if (dashboard.selectedList) dashboard.setSelectedList(null);
-                router.push("/");
+                setActiveView("home");
               }}
               className="flex items-center gap-2 group cursor-pointer"
             >
@@ -419,31 +413,24 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Lado derecho */}
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
-
-            {(dashboard.isOwner || dashboard.isAdmin || (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'superadmin') && (
-              <Link
-                href="/admin2"
-                className="flex items-center justify-center px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 rounded-lg text-xs font-semibold text-cyan-400 gap-1.5"
-                title="Administrador"
+            {isAdmin && (
+              <button
+                onClick={() => setActiveView("admin")}
+                className={`flex items-center gap-2 justify-center px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  activeView === "admin"
+                    ? isSuperAdmin
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                      : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                    : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
+                }`}
+                title={isSuperAdmin ? "Panel de Super Administrador" : "Panel de Administrador"}
               >
-                <Shield className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Admin</span>
-              </Link>
+                {isSuperAdmin ? <Crown className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{isSuperAdmin ? "Super Admin" : "Admin"}</span>
+              </button>
             )}
-
-            {(session?.user as any)?.role === 'superadmin' && (
-              <Link
-                href="/admin"
-                className="flex items-center justify-center px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-semibold text-amber-400 gap-1.5"
-                title="Super Admin"
-              >
-                <Shield className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Super</span>
-              </Link>
-            )}
-
+            
             {dashboard.memberships && dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef} className="w-[130px] sm:w-[180px]">
                 <WorkspaceSelector
@@ -477,10 +464,16 @@ export default function HomePage() {
             )}
 
             {dashboard.workspaceId && (
-              <Link
-                href={`/workspace/${dashboard.workspaceId}/users`}
-                onClick={() => markAllAsRead()}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
+              <button
+                onClick={() => {
+                  setActiveView("users");
+                  markAllAsRead();
+                }}
+                className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-sm whitespace-nowrap ${
+                  activeView === "users"
+                    ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                    : "bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-slate-200"
+                }`}
                 title="Ver usuarios"
               >
                 <Users className="w-4 h-4 text-cyan-400" />
@@ -492,18 +485,22 @@ export default function HomePage() {
                     </span>
                   </span>
                 )}
-              </Link>
+              </button>
             )}
 
             {dashboard.workspaceId && (
-              <Link
-                href={`/workspace/${dashboard.workspaceId}/assigned-users`}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-200 transition-colors shadow-sm whitespace-nowrap"
+              <button
+                onClick={() => setActiveView("assigned")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-sm whitespace-nowrap ${
+                  activeView === "assigned"
+                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                    : "bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-slate-200"
+                }`}
                 title="Ver asignaciones de tareas"
               >
                 <FolderKanban className="w-4 h-4 text-purple-400" />
                 <span className="hidden sm:inline">Asignaciones</span>
-              </Link>
+              </button>
             )}
 
             <div className="relative" ref={profileMenuRef}>
@@ -516,7 +513,6 @@ export default function HomePage() {
                 </div>
                 <ChevronDown className="w-3 h-3 text-slate-400 hidden sm:block" />
               </button>
-
               {dashboard.isProfileMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => dashboard.setIsProfileMenuOpen(false)}></div>
@@ -524,8 +520,13 @@ export default function HomePage() {
                     <div className="px-3 py-2 border-b border-slate-800">
                       <p className="text-xs font-bold text-white truncate">{session?.user?.name}</p>
                       <p className="text-[10px] text-slate-400 truncate">{session?.user?.email}</p>
+                      {isAdmin && (
+                        <p className={`text-[10px] font-semibold mt-1 ${isSuperAdmin ? 'text-amber-400' : 'text-cyan-400'}`}>
+                          {isSuperAdmin ? '👑 Super Admin' : '🛡️ Admin'}
+                        </p>
+                      )}
                     </div>
-                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); router.push('/profile'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">
+                    <button onClick={() => { dashboard.setIsProfileMenuOpen(false); setActiveView("profile"); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">
                       <User className="w-3.5 h-3.5" /><span>Perfil</span>
                     </button>
                     <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsJoinModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10">
@@ -550,7 +551,6 @@ export default function HomePage() {
             onClick={() => dashboard.setIsSidebarOpen(false)}
           />
         )}
-
         <aside
           className={`
             absolute md:relative z-30 h-full w-72 flex-shrink-0
@@ -566,19 +566,210 @@ export default function HomePage() {
               key={sidebarRefreshKey}
               workspaceId={dashboard.workspaceId || ""}
               organizationName={dashboard.planInfo?.organizationName || "Mi Organización"}
-              onSelectList={dashboard.handleListSelect}
+              onSelectList={(list) => {
+                dashboard.handleListSelect(list);
+                setActiveView("dashboard");
+              }}
               onOpenFolderModal={dashboard.handleOpenFolderModal}
             />
           </div>
           <div className="p-3 pt-2 flex-shrink-0 border-t border-slate-800/60 bg-slate-950/20">
-            <Link href="/dashboard" className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/80 text-slate-300 hover:text-white transition-all text-xs font-semibold">
+            <button
+              onClick={() => {
+                dashboard.setSelectedList(null);
+                setActiveView("dashboard");
+              }}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all text-xs font-semibold ${
+                activeView === "dashboard" 
+                  ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" 
+                  : "border-slate-800 hover:bg-slate-800/80 text-slate-300 hover:text-white"
+              }`}
+            >
               <LayoutDashboard className="w-4 h-4 text-cyan-400" /><span>Dashboard</span>
-            </Link>
+            </button>
           </div>
         </aside>
 
         <main className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
-          {dashboard.selectedList ? (
+          
+          {/* ✅ VISTA: INICIO (¿Qué quieres hacer hoy?) */}
+          {activeView === "home" && (
+            hasWorkspace ? (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
+                <div className="max-w-6xl mx-auto">
+                  <div className="text-center mb-8">
+                    <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">¿Qué quieres hacer hoy?</h1>
+                    <p className="text-xs text-slate-400">Elige una opción para continuar</p>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+                    <div className="space-y-4 lg:border-r lg:border-slate-800/60 lg:pr-8">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
+                          <Clock className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <div>
+                          <h2 className="text-base font-bold text-white">¿Seguimos trabajando en?</h2>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Tus tareas más recientes</p>
+                        </div>
+                      </div>
+                      {isLoadingAllTasks ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-400 border-t-transparent"></div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {allRecentTasks.map((task) => (
+                            <button
+                              key={task.id}
+                              onClick={() => {
+                                const space = dashboard.spaces?.find((s: any) => s.id === task.spaceId);
+                                const list = space?.lists?.find((l: any) => l.id === task.listId);
+                                if (list && space) {
+                                  dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
+                                  setTimeout(() => dashboard.openEditModal(task as any), 300);
+                                }
+                              }}
+                              className="w-full text-left p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-sm font-semibold text-white truncate group-hover:text-cyan-300 transition-colors">{task.title}</h3>
+                                  {task.description && (
+                                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{task.description}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                      task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                      task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                      'bg-slate-700/50 text-slate-400 border border-slate-700'
+                                    }`}>
+                                      {task.status === 'done' ? 'Completada' : task.status === 'in_progress' ? 'En progreso' : 'Por hacer'}
+                                    </span>
+                                    {task.priority && task.priority > 0 && (
+                                      <span className={`text-[10px] font-medium ${
+                                        task.priority >= 4 ? 'text-rose-400' :
+                                        task.priority >= 3 ? 'text-orange-400' :
+                                        'text-slate-400'
+                                      }`}>
+                                        {task.priority >= 4 ? '🔥 Urgente' : task.priority >= 3 ? ' Alta' : 'Normal'}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-500">{task.listName}</span>
+                                  </div>
+                                </div>
+                                <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!isLoadingAllTasks && allRecentTasks.length === 0 && (
+                        <div className="text-center py-12">
+                          <CheckSquare className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+                          <p className="text-sm text-slate-400">No hay tareas recientes</p>
+                          <p className="text-xs text-slate-500 mt-1">Crea tu primera tarea para comenzar</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-purple-400" />
+                        </div>
+                        <div>
+                          <h2 className="text-base font-bold text-white">¿O prefieres crear algo nuevo?</h2>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Empieza algo nuevo</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2.5">
+                        <button
+                          onClick={() => {
+                            if (!canCreateWorkspace) {
+                              dashboard.setPlanLimitModal({
+                                isOpen: true,
+                                type: "workspaces",
+                                currentPlan: dashboard.planInfo?.planName || "Free",
+                                currentCount: dashboard.planInfo?.workspaceCount || 0,
+                                limit: dashboard.planInfo?.workspaceLimit || 0
+                              });
+                            } else {
+                              setIsCreateWorkspaceModalOpen(true);
+                            }
+                          }}
+                          className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-amber-500/30 rounded-xl transition-all group"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Building2 className="w-5 h-5 text-amber-400" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h3 className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors">Nuevo Workspace</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Crea un espacio de trabajo completo</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+                        </button>
+                        <button
+                          onClick={() => setIsCreateSpaceModalOpen(true)}
+                          className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <FolderKanban className="w-5 h-5 text-purple-400" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h3 className="text-sm font-semibold text-white group-hover:text-purple-300 transition-colors">Nuevo Espacio</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Organiza tus proyectos en espacios</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                        </button>
+                        <button
+                          onClick={() => setIsCreateFolderModalOpen(true)}
+                          className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Folder className="w-5 h-5 text-indigo-400" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h3 className="text-sm font-semibold text-white group-hover:text-indigo-300 transition-colors">Nueva Carpeta</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Organiza dentro de un espacio</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                        </button>
+                        <button
+                          onClick={handleCreateTaskFromHome}
+                          className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <CheckSquare className="w-5 h-5 text-cyan-400" />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h3 className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">Nueva Tarea</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">Agrega una tarea a tu lista</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center p-6">
+                <div className="text-center max-w-sm p-6 sm:p-8 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-2xl shadow-xl shadow-cyan-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto mb-4 text-cyan-400 shadow-lg"><Layers className="w-6 h-6" /></div>
+                  <h2 className="text-lg font-bold text-white mb-1">Project SaaS</h2>
+                  <p className="text-xs text-slate-400 mb-6 font-light">Selecciona una lista en el panel izquierdo para comenzar a planificar.</p>
+                  <button onClick={dashboard.createFirstList} className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all text-xs">Crear mi primera lista</button>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* ✅ VISTA: DASHBOARD DE MÉTRICAS */}
+          {activeView === "dashboard" && !dashboard.selectedList && (
+            <DashboardView />
+          )}
+
+          {/* ✅ VISTA: LISTA DE TAREAS */}
+          {activeView === "dashboard" && dashboard.selectedList && (
             <>
               <div className="px-4 sm:px-6 py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -610,7 +801,6 @@ export default function HomePage() {
                     </button>
                   </div>
                 </div>
-
                 <div className="mt-3 pt-3 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 relative z-10">
                   <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
                     <div className="relative flex-1 max-w-sm">
@@ -644,7 +834,6 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
-
               <div className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col relative z-0 overflow-y-auto">
                 {dashboard.viewMode === "list" ? (
                   <div className="max-w-4xl mx-auto w-full">
@@ -661,198 +850,21 @@ export default function HomePage() {
                 )}
               </div>
             </>
-          ) : hasWorkspace ? (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
-              <div className="max-w-6xl mx-auto">
-                <div className="text-center mb-8">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">¿Qué quieres hacer hoy?</h1>
-                  <p className="text-xs text-slate-400">Elige una opción para continuar</p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
-                  <div className="space-y-4 lg:border-r lg:border-slate-800/60 lg:pr-8">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
-                        <Clock className="w-4 h-4 text-cyan-400" />
-                      </div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">¿Seguimos trabajando en?</h2>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Tus tareas más recientes</p>
-                      </div>
-                    </div>
-
-                    {isLoadingAllTasks ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-400 border-t-transparent"></div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {allRecentTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            onClick={() => {
-                              const space = dashboard.spaces?.find((s: any) => s.id === task.spaceId);
-                              const list = space?.lists?.find((l: any) => l.id === task.listId);
-                              if (list && space) {
-                                dashboard.handleListSelect({ id: list.id, name: list.name, spaceId: space.id });
-                                setTimeout(() => dashboard.openEditModal(task as any), 300);
-                              }
-                            }}
-                            className="w-full text-left p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-semibold text-white truncate group-hover:text-cyan-300 transition-colors">
-                                  {task.title}
-                                </h3>
-                                {task.description && (
-                                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                                    {task.description}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                    task.status === 'done' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                    task.status === 'in_progress' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                    'bg-slate-700/50 text-slate-400 border border-slate-700'
-                                  }`}>
-                                    {task.status === 'done' ? 'Completada' : task.status === 'in_progress' ? 'En progreso' : 'Por hacer'}
-                                  </span>
-                                  {task.priority && task.priority > 0 && (
-                                    <span className={`text-[10px] font-medium ${
-                                      task.priority >= 4 ? 'text-rose-400' :
-                                      task.priority >= 3 ? 'text-orange-400' :
-                                      'text-slate-400'
-                                    }`}>
-                                      {task.priority >= 4 ? '🔥 Urgente' : task.priority >= 3 ? ' Alta' : 'Normal'}
-                                    </span>
-                                  )}
-                                  <span className="text-[10px] text-slate-500">
-                                    {task.listName}
-                                  </span>
-                                </div>
-                              </div>
-                              <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {!isLoadingAllTasks && allRecentTasks.length === 0 && (
-                      <div className="text-center py-12">
-                        <CheckSquare className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-                        <p className="text-sm text-slate-400">No hay tareas recientes</p>
-                        <p className="text-xs text-slate-500 mt-1">Crea tu primera tarea para comenzar</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 border border-purple-500/30 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                      </div>
-                      <div>
-                        <h2 className="text-base font-bold text-white">¿O prefieres crear algo nuevo?</h2>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Empieza algo nuevo</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <button
-                        onClick={() => {
-                          if (!canCreateWorkspace) {
-                            dashboard.setPlanLimitModal({
-                              isOpen: true,
-                              type: "workspaces",
-                              currentPlan: dashboard.planInfo?.planName || "Free",
-                              currentCount: dashboard.planInfo?.workspaceCount || 0,
-                              limit: dashboard.planInfo?.workspaceLimit || 0
-                            });
-                          } else {
-                            setIsCreateWorkspaceModalOpen(true);
-                          }
-                        }}
-                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-amber-500/30 rounded-xl transition-all group"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Building2 className="w-5 h-5 text-amber-400" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h3 className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors">Nuevo Workspace</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Crea un espacio de trabajo completo</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
-                      </button>
-
-                      <button
-                        onClick={() => setIsCreateSpaceModalOpen(true)}
-                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-purple-500/30 rounded-xl transition-all group"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <FolderKanban className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h3 className="text-sm font-semibold text-white group-hover:text-purple-300 transition-colors">Nuevo Espacio</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Organiza tus proyectos en espacios</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
-                      </button>
-
-                      <button
-                        onClick={() => setIsCreateFolderModalOpen(true)}
-                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-indigo-500/30 rounded-xl transition-all group"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Folder className="w-5 h-5 text-indigo-400" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h3 className="text-sm font-semibold text-white group-hover:text-indigo-300 transition-colors">Nueva Carpeta</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Organiza dentro de un espacio</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
-                      </button>
-
-                      <button
-                        onClick={handleCreateTaskFromHome}
-                        className="w-full flex items-center gap-3.5 p-3.5 bg-slate-900/40 hover:bg-slate-900/60 border border-slate-800/60 hover:border-cyan-500/30 rounded-xl transition-all group"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <CheckSquare className="w-5 h-5 text-cyan-400" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <h3 className="text-sm font-semibold text-white group-hover:text-cyan-300 transition-colors">Nueva Tarea</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Agrega una tarea a tu lista</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center p-6">
-              <div className="text-center max-w-sm p-6 sm:p-8 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-2xl shadow-xl shadow-cyan-500/5">
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mx-auto mb-4 text-cyan-400 shadow-lg"><Layers className="w-6 h-6" /></div>
-                <h2 className="text-lg font-bold text-white mb-1">Project SaaS</h2>
-                <p className="text-xs text-slate-400 mb-6 font-light">Selecciona una lista en el panel izquierdo para comenzar a planificar.</p>
-                <button onClick={dashboard.createFirstList} className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 transition-all text-xs">Crear mi primera lista</button>
-              </div>
-            </div>
           )}
+
+          {/* ✅ VISTAS: ADMIN, USUARIOS, ASIGNACIONES, PERFIL */}
+          {activeView === "admin" && <AdminView isSuperAdmin={isSuperAdmin} />}
+          {activeView === "users" && <UsersView />}
+          {activeView === "assigned" && <AssignedView />}
+          {activeView === "profile" && <ProfileView />}
         </main>
       </div>
 
-      {/* ✅ CORREGIDO: onClose ahora selecciona la lista de la tarea antes de cerrar */}
+      {/* MODALES */}
       <TaskModal 
         isOpen={dashboard.isModalOpen} 
         onClose={() => {
-          // ✅ SOLUCIÓN CLAVE: Al cerrar el modal, si la tarea tiene una lista, la seleccionamos.
-          // Esto evita que el usuario quede atrapado en la pantalla de inicio ("¿Qué quieres hacer hoy?")
           const taskListId = dashboard.editingTask?.listId;
-          
           if (taskListId && !dashboard.selectedList && dashboard.spaces) {
             for (const space of dashboard.spaces) {
               if (space.lists) {
@@ -871,9 +883,8 @@ export default function HomePage() {
         listId={dashboard.selectedList?.id || ""} 
         workspaceId={dashboard.workspaceId || ""} 
       />
-      
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
-
+      
       {isCreateWorkspaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -896,7 +907,7 @@ export default function HomePage() {
           </div>
         </div>
       )}
-
+      
       {isCreateSpaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1045,7 +1056,6 @@ export default function HomePage() {
           limit={dashboard.planLimitModal.limit}
         />
       )}
-
       <AIAssistant />
     </div>
   );

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
     const codes = await prisma.inviteCode.findMany({
       include: {
-        createdBy: { select: { name: true } },
+        createdBy: { select: { name: true, email: true } },
         workspace: { select: { name: true } }
       },
       orderBy: { createdAt: "desc" }
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
     }
 
     // ✅ SOLUCIÓN: Siempre proporcionar una fecha válida
-    // Si no hay expiresAt, establecer una fecha por defecto (1 año desde ahora)
     const expirationDate = expiresAt 
       ? new Date(expiresAt) 
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 año desde ahora
@@ -72,10 +71,10 @@ export async function POST(request: Request) {
         maxUses: maxUses || 5,
         usedCount: 0,
         active: true,
-        expiresAt: expirationDate  // ✅ Siempre una fecha válida, nunca null
+        expiresAt: expirationDate
       },
       include: {
-        createdBy: { select: { name: true } },
+        createdBy: { select: { name: true, email: true } },
         workspace: { select: { name: true } }
       }
     });
@@ -83,6 +82,41 @@ export async function POST(request: Request) {
     return NextResponse.json(inviteCode, { status: 201 });
   } catch (error: any) {
     console.error("Error creando código:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// ✅ MÉTODO DELETE AGREGADO PARA QUE FUNCIONE EL BOTÓN DE ELIMINAR
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "ID del código es requerido" }, { status: 400 });
+    }
+
+    await prisma.inviteCode.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true, message: "Código eliminado correctamente" });
+  } catch (error: any) {
+    console.error("Error eliminando código:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

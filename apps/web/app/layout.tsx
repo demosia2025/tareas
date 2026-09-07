@@ -16,12 +16,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="dark">
-      <body className={`${inter.className} bg-[#0b0f19] text-gray-100 min-h-screen flex flex-col antialiased overflow-x-hidden`}>
+    <html lang="es" className="dark" style={{ overflow: "hidden", height: "100dvh" }}>
+      <body 
+        className={`${inter.className} bg-[#0b0f19] text-gray-100 antialiased overflow-hidden`}
+        style={{ height: "100dvh", margin: 0, padding: 0 }}
+      >
         <Providers>
-          <main className="flex-1 flex flex-col w-full overflow-y-auto md:overflow-hidden">
-            {children}
-          </main>
+          {children}
         </Providers>
       </body>
     </html>

@@ -1,4 +1,3 @@
-// apps/web/components/ActivityTab.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import { Send, Paperclip, FileText, UserPlus, Users, Image as ImageIcon, Loader2, Trash2, Search, X, Check } from "lucide-react";
@@ -37,6 +36,7 @@ interface WorkspaceMember {
     name: string | null;
     email: string | null;
     image: string | null;
+    role?: string;
   };
 }
 
@@ -53,6 +53,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -81,6 +82,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
     }
   }, [taskId]);
 
+  // ✅ CORREGIDO: Usar endpoint correcto con query params
   useEffect(() => {
     const fetchWorkspaceMembers = async () => {
       if (!workspaceId) {
@@ -88,13 +90,11 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         return;
       }
       try {
-        let res = await fetch(`/api/workspace/${workspaceId}/members`);
-        if (!res.ok) {
-          res = await fetch(`/api/workspaces/${workspaceId}/members`);
-        }
+        // ✅ CAMBIO: /api/workspace/members?workspaceId=... en lugar de /api/workspaces/${workspaceId}/members
+        const res = await fetch(`/api/workspace/${workspaceId}/members`);
         if (res.ok) {
           const data = await res.json();
-          const list = Array.isArray(data) ? data : data.members || [];
+          const list = Array.isArray(data) ? data : [];
           setWorkspaceMembers(list);
         } else {
           console.error("No se pudieron cargar los miembros del workspace. Código:", res.status);
@@ -160,20 +160,31 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64String = reader.result as string;
-      handleSend(undefined, {
-        name: file.name,
-        url: base64String,
-        type: file.type,
-        size: file.size,
+    if (!file || !taskId) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("taskId", taskId);
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
       });
-    };
-    reader.readAsDataURL(file);
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json();
+        alert(err.error || "Error al subir el archivo");
+        return;
+      }
+      await fetchData();
+    } catch (error) {
+      console.error("Error al subir el archivo:", error);
+      alert("Error de conexión al subir el archivo");
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleInviteCollaborator = async () => {
@@ -235,9 +246,13 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
     return name.includes(query) || email.includes(query);
   });
 
+  const handleOpenFile = (attachment: Attachment) => {
+    const proxyUrl = `/api/attachments/${attachment.id}`;
+    window.open(proxyUrl, '_blank');
+  };
+
   return (
     <div className="flex flex-col text-slate-200">
-      {/* Sub-navegación interna */}
       <div className="flex border-b border-slate-800 pb-2 gap-4 flex-shrink-0">
         <button
           onClick={() => setActiveSubTab("chat")}
@@ -256,9 +271,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           Miembros de la Tarea
         </button>
       </div>
-
       {activeSubTab === "chat" ? (
-        /* ✅ CHAT: Mantiene h-[65vh] porque necesita scroll para mensajes */
         <div className="flex flex-col h-[65vh] space-y-3">
           {attachments.length > 0 && (
             <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
@@ -269,12 +282,10 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                 {attachments.map((att) => {
                   const imageFile = isImage(att.fileType, att.fileName);
                   return (
-                    <a
+                    <div
                       key={att.id}
-                      href={att.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group flex flex-col bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg overflow-hidden transition-all"
+                      onClick={() => handleOpenFile(att)}
+                      className="group flex flex-col bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg overflow-hidden transition-all cursor-pointer"
                     >
                       {imageFile ? (
                         <div className="w-full h-24 bg-slate-900 overflow-hidden relative">
@@ -295,7 +306,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                           {att.fileName}
                         </span>
                       </div>
-                    </a>
+                    </div>
                   );
                 })}
               </div>
@@ -317,7 +328,9 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                         }) : ""}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-100 break-words">{activity.body}</p>
+                    <div className="text-xs text-slate-100 break-words">
+                      {activity.body}
+                    </div>
                   </div>
                 </div>
               ))
@@ -326,9 +339,16 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
             )}
           </div>
           <form onSubmit={(e) => handleSend(e)} className="pt-2 flex items-center gap-2 mt-auto border-t border-slate-800">
-            <label className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors" title="Adjuntar archivo">
-              <Paperclip className="w-4 h-4" />
-              <input type="file" onChange={handleFileUpload} className="hidden" />
+            <label className={`p-2 rounded-lg cursor-pointer transition-colors ${
+              isUploading ? 'bg-slate-800 text-slate-500' : 'text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800'
+            }`} title="Adjuntar archivo">
+              {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+              <input 
+                type="file" 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                disabled={isUploading} 
+              />
             </label>
             <input
               type="text"
@@ -336,10 +356,11 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Escribe un comentario..."
               className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+              disabled={isUploading}
             />
             <button
               type="submit"
-              disabled={!newComment.trim()}
+              disabled={!newComment.trim() || isUploading}
               className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
             >
               <Send className="w-3.5 h-3.5" />
@@ -348,9 +369,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           </form>
         </div>
       ) : (
-        /* ✅ MIEMBROS: SIN h-[65vh], compacto sin scroll general */
         <div className="space-y-3">
-          {/* Pestañas internas: Asignar / Invitar */}
           <div className="flex gap-2 bg-slate-900/40 p-1 rounded-lg border border-slate-800 flex-shrink-0">
             <button
               onClick={() => setMemberTab("assign")}
@@ -371,9 +390,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               Invitar Colaboradores
             </button>
           </div>
-
           {memberTab === "assign" ? (
-            /* SECCIÓN: ASIGNAR RESPONSABLE - Compacta sin scroll general */
             <div className="space-y-3">
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -410,8 +427,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                   <span className="text-[10px] text-emerald-400 mt-1 block">✓ Responsable asignado correctamente</span>
                 )}
               </div>
-
-              {/* ✅ Lista de usuarios con scroll interno SOLO en la lista (max-h-32) */}
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Usuarios de la Organización ({filteredMembers.length})
@@ -444,7 +459,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               </div>
             </div>
           ) : (
-            /* SECCIÓN: INVITAR COLABORADORES - Compacta sin scroll general */
             <div className="space-y-3">
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -473,13 +487,11 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                     disabled={loadingInvite || !inviteMemberId}
                     className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1"
                   >
-                    {loadingInvite && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {loadingInvite && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Invitar
                   </button>
                 </div>
               </div>
-
-              {/* ✅ Lista de colaboradores con scroll interno SOLO en la lista (max-h-32) */}
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Colaboradores Invitados ({members.length})
@@ -506,7 +518,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                             onClick={() => handleRemoveCollaborator(targetUserId)}
                             className="text-red-400 hover:text-red-300 text-[11px] px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center gap-1"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                             Remover
                           </button>
                         </div>

@@ -6,22 +6,19 @@ import { auth } from "@/auth";
 export async function GET() {
   try {
     const session = await auth();
-    
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-
-    // Verificar que el usuario sea superadmin
+    
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true },
     });
-
+    
     if (user?.role !== "superadmin" && user?.role !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
-    // Obtener todas las invitaciones con sus relaciones
     const invitations = await prisma.userInvitation.findMany({
       include: {
         workspace: {
@@ -67,6 +64,15 @@ export async function POST(req: Request) {
     }
 
     const currentUserId = session.user.id;
+    
+    // ✅ VERIFICAR SI EL USUARIO ES SUPER ADMIN
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { role: true }
+    });
+
+    const isSuperAdmin = currentUser?.role === "superadmin";
+
     const body = await req.json();
     const { email, workspaceId, role = "member" } = body;
 
@@ -74,21 +80,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    // Verificar que el usuario actual sea admin/owner del workspace
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId: currentUserId,
+    // ✅ BYPASS PARA SUPER ADMIN: No necesita ser miembro del workspace
+    if (!isSuperAdmin) {
+      const membership = await prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: currentUserId,
+          },
         },
-      },
-    });
+      });
 
-    if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+      if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
+        return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+      }
     }
 
-    // Buscar el usuario por email
     const targetUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
@@ -97,7 +104,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    // Verificar que no sea ya miembro
     const existingMembership = await prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: {
@@ -111,7 +117,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El usuario ya es miembro de este workspace" }, { status: 400 });
     }
 
-    // ✅ CREAR LA MEMBRESÍA DIRECTAMENTE (no solo invitación)
+    // Crear la membresía directamente
     await prisma.workspaceMember.create({
       data: {
         workspaceId,
@@ -120,7 +126,7 @@ export async function POST(req: Request) {
       },
     });
 
-    // Opcional: Crear también un registro de invitación para tracking
+    // Crear registro de invitación para tracking
     const invitation = await prisma.userInvitation.create({
       data: {
         workspaceId,
@@ -139,5 +145,39 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Error inviting user:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
+// ✅ DELETE: Eliminar invitación
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    });
+
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    await prisma.userInvitation.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true, message: "Invitación eliminada correctamente" });
+  } catch (error: any) {
+    console.error("Error eliminando invitación:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

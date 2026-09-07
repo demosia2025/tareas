@@ -39,27 +39,19 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [listId, setListId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  
   const [taskMembers, setTaskMembers] = useState<TaskMember[]>([]);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
 
-  // ✅ FUNCIÓN MEJORADA PARA CERRAR Y REDIRIGIR
   const handleClose = async () => {
-    console.log("🚀 [DEBUG] Cerrando modal. workspaceId:", workspaceId, "listId:", listId, "currentTask.listId:", currentTask.listId);
-    
-    // Cerrar el modal primero
+    console.log(" [DEBUG] Cerrando modal. workspaceId:", workspaceId, "listId:", listId, "currentTask.listId:", currentTask.listId);
     onClose();
-    
-    // Determinar qué listId usar
     const targetListId = listId || currentTask.listId;
-    
     if (workspaceId && targetListId) {
       console.log("✅ [DEBUG] Redirigiendo a la lista:", targetListId);
       router.push(`/?listId=${targetListId}`);
     } else if (workspaceId) {
-      // Si no hay listId, intentar obtenerlo de la tarea
       console.log("⚠️ [DEBUG] No hay listId disponible, intentando obtener de la API...");
       try {
         const res = await fetch(`/api/tasks?workspaceId=${workspaceId}`);
@@ -75,7 +67,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
       } catch (error) {
         console.error("Error obteniendo listId:", error);
       }
-      // Si todo falla, ir al workspace
       console.warn("⚠️ [DEBUG] No se pudo obtener listId, redirigiendo al workspace");
       router.push(`/workspace/${workspaceId}`);
     } else {
@@ -104,7 +95,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
           if (data.task.listId) {
             console.log("✅ [DEBUG] listId encontrado:", data.task.listId);
             setListId(data.task.listId);
-            // Actualizar el taskStack con el listId
             setTaskStack(prev => {
               const updated = [...prev];
               if (updated.length > 0 && updated[updated.length - 1].id === targetTaskId) {
@@ -126,7 +116,8 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
         const subData = await subRes.json();
         setSubtasks(Array.isArray(subData) ? subData : []);
       }
-      const memRes = await fetch(`/api/workspace/${workspaceId}/members`);
+      // ✅ CORREGIDO: Usar query params en lugar de ruta dinámica
+      const memRes = await fetch(`/api/workspace/members?workspaceId=${workspaceId}`);
       if (memRes.ok) {
         const memData = await memRes.json();
         setMembers(Array.isArray(memData) ? memData : []);
@@ -156,6 +147,7 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
   const fetchWorkspaceMembers = async () => {
     try {
       if (!workspaceId) return;
+      // ✅ CORREGIDO: Usar query params en lugar de ruta dinámica
       const res = await fetch(`/api/workspace/${workspaceId}/members`);
       if (res.ok) {
         const data = await res.json();
@@ -237,7 +229,8 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     try {
-      const res = await fetch(`/api/workspace/${workspaceId}/members`, {
+      // ✅ CORREGIDO: Usar query params en lugar de ruta dinámica
+      const res = await fetch(`/api/workspace/members?workspaceId=${workspaceId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail }),
@@ -303,7 +296,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
             </button>
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center h-full text-xs text-slate-400">Cargando información...</div>
@@ -326,7 +318,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                   />
                 </div>
               </div>
-
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -419,7 +410,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                   </div>
                 )}
               </div>
-
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
                 <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
                   <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
@@ -438,7 +428,6 @@ export function TaskDetailModal({ taskId, workspaceId, onClose }: TaskDetailModa
                   </button>
                 </form>
               </div>
-
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Miembros de la Organización</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

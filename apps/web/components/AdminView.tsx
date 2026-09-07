@@ -1,12 +1,10 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   Users, FolderKanban, Layers, Building2,
-  User, LogOut, Plus, Trash2, Edit3, Search, BarChart3, Key, UserPlus, X,
-  ChevronLeft, ChevronDown, Crown, Shield
+  Plus, Trash2, Edit3, Search, BarChart3, Key, UserPlus, X,
+  Crown, Shield
 } from "lucide-react";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 
@@ -89,13 +87,14 @@ const SearchableSelect = ({
 // ==========================================
 // COMPONENTE PRINCIPAL
 // ==========================================
-export default function AdminPage() {
-  const router = useRouter();
+export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const { data: session } = useSession();
   const admin = useAdminDashboard();
+  
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
+  
   const [isEditWorkspaceOpen, setIsEditWorkspaceOpen] = useState(false);
   const [isEditSpaceOpen, setIsEditSpaceOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<any>(null);
@@ -126,6 +125,7 @@ export default function AdminPage() {
   const [isCreateCodeOpen, setIsCreateCodeOpen] = useState(false);
   const [isCreateInvitationOpen, setIsCreateInvitationOpen] = useState(false);
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
+  
   const [newOrgForm, setNewOrgForm] = useState({ name: "", slug: "", plan: "free", description: "" });
   const [newSpaceForm, setNewSpaceForm] = useState({ name: "", workspaceId: "", description: "", color: "#8b5cf6" });
   const [newCodeForm, setNewCodeForm] = useState({ targetId: "", targetType: "workspace", maxUses: 5, expiresAt: "" });
@@ -153,10 +153,60 @@ export default function AdminPage() {
     setEditWorkspaceForm({ name: ws.name, plan: ws.plan, slug: ws.slug });
     setIsEditWorkspaceOpen(true);
   };
+  
   const openEditSpace = (space: any) => {
     setEditingSpace(space);
     setEditSpaceForm({ name: space.name, color: space.color || "#8b5cf6", description: space.description || "" });
     setIsEditSpaceOpen(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admin.editingUser) return;
+    try {
+      const body: any = { 
+        name: admin.editForm.name,
+        email: admin.editForm.email,
+        role: admin.editForm.role 
+      };
+      if (admin.editForm.password && admin.editForm.password.trim() !== "") {
+        body.password = admin.editForm.password;
+      }
+      const res = await fetch(`/api/admin/users?id=${admin.editingUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        await admin.fetchData();
+        admin.setEditingUser(null);
+        admin.setEditForm({ name: "", email: "", role: "user", password: "" });
+        alert("✅ Usuario actualizado correctamente");
+      } else {
+        const err = await res.json();
+        alert(`❌ Error: ${err.error || "No se pudo actualizar el usuario"}`);
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
+      alert("❌ Error de conexión");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar al usuario "${userName}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
+      if (res.ok) {
+        await admin.fetchData();
+        alert("✅ Usuario eliminado correctamente");
+      } else {
+        const err = await res.json();
+        alert(`❌ Error: ${err.error || "No se pudo eliminar. Es posible que el usuario tenga tareas o membresías asociadas."}`);
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      alert("❌ Error de conexión");
+    }
   };
 
   const handleUpdateWorkspace = async (e: React.FormEvent) => {
@@ -168,16 +218,16 @@ export default function AdminPage() {
         body: JSON.stringify(editWorkspaceForm)
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsEditWorkspaceOpen(false);
         setEditingWorkspace(null);
-        alert("Workspace actualizado");
+        alert("✅ Workspace actualizado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al actualizar workspace");
+        alert(`❌ Error: ${err.error || "Error al actualizar workspace"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -190,16 +240,16 @@ export default function AdminPage() {
         body: JSON.stringify(editSpaceForm)
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsEditSpaceOpen(false);
         setEditingSpace(null);
-        alert("Space actualizado");
+        alert("✅ Space actualizado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al actualizar space");
+        alert(`❌ Error: ${err.error || "Error al actualizar space"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -208,14 +258,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/workspaces?id=${wsId}`, { method: "DELETE" });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
-        alert("Workspace eliminado");
+        if (admin.fetchData) await admin.fetchData();
+        alert("✅ Workspace eliminado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al eliminar workspace");
+        alert(`❌ Error: ${err.error || "Error al eliminar workspace"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -224,14 +274,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/spaces?id=${spaceId}`, { method: "DELETE" });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
-        alert("Space eliminado");
+        if (admin.fetchData) await admin.fetchData();
+        alert("✅ Space eliminado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al eliminar space");
+        alert(`❌ Error: ${err.error || "Error al eliminar space"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -240,13 +290,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/invite-codes?id=${codeId}`, { method: "DELETE" });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
+        alert("✅ Código eliminado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al eliminar código");
+        alert(`❌ Error: ${err.error || "Error al eliminar código"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -255,13 +306,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/invitations?id=${invitationId}`, { method: "DELETE" });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
+        alert("✅ Invitación eliminada");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al eliminar invitación");
+        alert(`❌ Error: ${err.error || "Error al eliminar invitación"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -275,16 +327,16 @@ export default function AdminPage() {
         body: JSON.stringify({ ...newOrgForm, id: orgId, slug: newOrgForm.slug || generateRandomSlug(newOrgForm.name) })
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsCreateOrgOpen(false);
         setNewOrgForm({ name: "", slug: "", plan: "free", description: "" });
-        alert(`Organización creada con ID: ${orgId}`);
+        alert(`✅ Organización creada con ID: ${orgId}`);
       } else {
         const err = await res.json();
-        alert(err.error || "Error al crear organización");
+        alert(`❌ Error: ${err.error || "Error al crear organización"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -298,16 +350,16 @@ export default function AdminPage() {
         body: JSON.stringify({ ...newWorkspaceForm, id: wsId, slug: generateRandomSlug(newWorkspaceForm.name) })
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsCreateWorkspaceOpen(false);
         setNewWorkspaceForm({ name: "", organizationId: "", plan: "free" });
-        alert(`Workspace creado con ID: ${wsId}`);
+        alert(`✅ Workspace creado con ID: ${wsId}`);
       } else {
         const err = await res.json();
-        alert(err.error || "Error al crear workspace");
+        alert(`❌ Error: ${err.error || "Error al crear workspace"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -321,16 +373,16 @@ export default function AdminPage() {
         body: JSON.stringify({ ...newSpaceForm, id: spaceId, slug: generateRandomSlug(newSpaceForm.name) })
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsCreateSpaceOpen(false);
         setNewSpaceForm({ name: "", workspaceId: "", description: "", color: "#8b5cf6" });
-        alert(`Space creado con ID: ${spaceId}`);
+        alert(`✅ Space creado con ID: ${spaceId}`);
       } else {
         const err = await res.json();
-        alert(err.error || "Error al crear space");
+        alert(`❌ Error: ${err.error || "Error al crear space"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -338,7 +390,7 @@ export default function AdminPage() {
     e.preventDefault();
     try {
       if (!newCodeForm.targetId) {
-        alert("Debes seleccionar un workspace o space");
+        alert("⚠️ Debes seleccionar un workspace o space");
         return;
       }
       const res = await fetch("/api/admin/invite-codes", {
@@ -353,15 +405,16 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsCreateCodeOpen(false);
         setNewCodeForm({ targetId: "", targetType: "workspace", maxUses: 5, expiresAt: "" });
+        alert("✅ Código creado");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al crear código");
+        alert(`❌ Error: ${err.error || "Error al crear código"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -369,7 +422,7 @@ export default function AdminPage() {
     e.preventDefault();
     try {
       if (!newInvitationForm.email || !newInvitationForm.targetId) {
-        alert("Email y workspace/space son requeridos");
+        alert("⚠️ Email y workspace/space son requeridos");
         return;
       }
       const res = await fetch("/api/admin/invitations", {
@@ -384,15 +437,16 @@ export default function AdminPage() {
         })
       });
       if (res.ok) {
-        if (admin.fetchData) admin.fetchData();
+        if (admin.fetchData) await admin.fetchData();
         setIsCreateInvitationOpen(false);
         setNewInvitationForm({ email: "", targetId: "", targetType: "workspace", role: "member" });
+        alert("✅ Invitación creada");
       } else {
         const err = await res.json();
-        alert(err.error || "Error al crear invitación");
+        alert(`❌ Error: ${err.error || "Error al crear invitación"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -404,14 +458,14 @@ export default function AdminPage() {
         body: JSON.stringify({ orgId, plan: newPlan })
       });
       if (res.ok) {
-        alert("Plan actualizado correctamente");
-        if (admin.fetchData) admin.fetchData();
+        alert("✅ Plan actualizado correctamente");
+        if (admin.fetchData) await admin.fetchData();
       } else {
         const err = await res.json();
-        alert(err.error || "Error al cambiar plan");
+        alert(`❌ Error: ${err.error || "Error al cambiar plan"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
@@ -420,25 +474,26 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/organizations?id=${orgId}`, { method: "DELETE" });
       if (res.ok) {
-        alert("Organización eliminada");
-        if (admin.fetchData) admin.fetchData();
+        alert("✅ Organización eliminada");
+        if (admin.fetchData) await admin.fetchData();
       } else {
         const err = await res.json();
-        alert(err.error || "Error al eliminar");
+        alert(`❌ Error: ${err.error || "Error al eliminar"}`);
       }
     } catch (error) {
-      alert("Error de conexión");
+      alert("❌ Error de conexión");
     }
   };
 
   if (admin.isLoading) return (
-    <div className="h-screen bg-slate-950 flex items-center justify-center">
+    <div className="h-full flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
     </div>
   );
+  
   if (!admin.isAdmin) return (
-    <div className="h-screen bg-slate-950 flex items-center justify-center text-red-500">
-      No tienes permisos de Super Administrador
+    <div className="h-full flex items-center justify-center text-red-500">
+      No tienes permisos de Administrador
     </div>
   );
 
@@ -453,359 +508,445 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col">
-      <header className="h-14 bg-slate-900/80 backdrop-blur-2xl border-b border-slate-800/80 flex-shrink-0 z-[9999]">
-        <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
+    <div className="flex-1 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/25 group-hover:scale-105 transition-transform">
-                <Shield className="w-4 h-4 text-white" />
+            {isSuperAdmin ? (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+                <Crown className="w-5 h-5 text-amber-400" />
               </div>
-              <div className="hidden sm:flex items-center space-x-3 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 shadow-lg backdrop-blur-sm">
-                <span className="text-sm font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
-                  Project SaaS - Admin
-                </span>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-cyan-400" />
               </div>
-            </Link>
+            )}
+            <div>
+              <h1 className="text-xl font-bold text-white">
+                {isSuperAdmin ? "Panel de Super Administrador" : "Panel de Administrador"}
+              </h1>
+              <p className="text-xs text-slate-400">
+                {isSuperAdmin 
+                  ? "Acceso total a todas las organizaciones, workspaces y usuarios del sistema" 
+                  : "Gestión de workspaces, espacios y usuarios"}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-xs font-semibold text-slate-300 transition-colors">
-              <ChevronLeft className="w-3.5 h-3.5" /> <span>Volver al Workspace</span>
-            </Link>
+          {isSuperAdmin && (
+            <div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <span className="text-xs font-semibold text-amber-400">👑 Super Admin</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 border-b border-slate-800/80 pb-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button 
+                key={tab.id} 
+                onClick={() => admin.setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                  admin.activeTab === tab.id 
+                    ? isSuperAdmin && tab.id === "overview"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                      : "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+                    : "bg-slate-900/40 border-slate-800/70 text-slate-400 hover:bg-slate-900/80"
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {admin.activeTab === "overview" && isSuperAdmin && (
+          <div className="space-y-6">
+            <div className="rounded-2xl p-4 border bg-gradient-to-r from-amber-950/20 to-orange-950/20 border-amber-500/30">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Crown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Vista Global del Sistema</h3>
+                  <p className="text-xs text-slate-400">Métricas de toda la plataforma</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900/60 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase">Total Organizaciones</p>
+                  <p className="text-2xl font-bold text-white">{admin.orgStats.length}</p>
+                </div>
+                <div className="bg-slate-900/60 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase">Total Workspaces</p>
+                  <p className="text-2xl font-bold text-white">{admin.stats.totalWorkspaces}</p>
+                </div>
+                <div className="bg-slate-900/60 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase">Total Usuarios</p>
+                  <p className="text-2xl font-bold text-white">{admin.stats.totalUsers}</p>
+                </div>
+                <div className="bg-slate-900/60 rounded-xl p-3">
+                  <p className="text-[10px] text-slate-400 uppercase">Total Tareas</p>
+                  <p className="text-2xl font-bold text-white">{admin.stats.totalTasks}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "workspaces" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Workspaces</h2>
+              <button onClick={() => setIsCreateWorkspaceOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Workspace
+              </button>
+            </div>
+            <SearchInput value={admin.searchWorkspaces} onChange={admin.setSearchWorkspaces} placeholder="Buscar workspace..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr>
+                      <th className="px-6 py-3.5">Nombre</th>
+                      <th className="px-6 py-3.5">Slug</th>
+                      <th className="px-6 py-3.5">Plan</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.workspaces.map((ws: any) => (
+                      <tr key={ws.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-semibold">{ws.name}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{ws.slug}</td>
+                        <td className="px-6 py-3.5 capitalize">{ws.plan}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => openEditWorkspace(ws)} className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded" title="Editar">
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDeleteWorkspace(ws.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "spaces" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Spaces</h2>
+              <button onClick={() => setIsCreateSpaceOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Space
+              </button>
+            </div>
+            <SearchInput value={admin.searchSpaces} onChange={admin.setSearchSpaces} placeholder="Buscar space..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr>
+                      <th className="px-6 py-3.5">Nombre</th>
+                      <th className="px-6 py-3.5">Workspace</th>
+                      <th className="px-6 py-3.5">Color</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.spaces.map((space: any) => (
+                      <tr key={space.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-semibold flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: space.color }} />
+                          {space.name}
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-400">{space.workspace?.name}</td>
+                        <td className="px-6 py-3.5 font-mono text-slate-400">{space.color}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => openEditSpace(space)} className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded" title="Editar">
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDeleteSpace(space.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "organizations" && isSuperAdmin && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Organizaciones</h2>
+              <button onClick={() => setIsCreateOrgOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Organización
+              </button>
+            </div>
+            <SearchInput value={admin.searchOrgs} onChange={admin.setSearchOrgs} placeholder="Buscar organización..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr><th className="px-6 py-3.5">Nombre</th><th className="px-6 py-3.5">Slug</th><th className="px-6 py-3.5">Plan</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.organizations.map((org: any) => (
+                      <tr key={org.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-semibold">{org.name}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{org.slug}</td>
+                        <td className="px-6 py-3.5 capitalize">{org.plan}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex justify-end gap-2">
+                            <select value={org.plan} onChange={(e) => handleChangeOrgPlan(org.id, e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                              <option value="free">Free</option>
+                              <option value="pro">Pro</option>
+                              <option value="premium">Premium</option>
+                            </select>
+                            <button onClick={() => handleDeleteOrg(org.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "users" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Usuarios</h2>
+              <button onClick={() => admin.setIsCreateUserOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Usuario
+              </button>
+            </div>
+            <SearchInput value={admin.searchUsers} onChange={admin.setSearchUsers} placeholder="Buscar usuario..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Email</th><th className="px-6 py-3.5">Rol</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.users.map((user: any) => (
+                      <tr key={user.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-semibold">{user.name}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{user.email}</td>
+                        <td className="px-6 py-3.5 capitalize">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            user.role === 'superadmin' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                            user.role === 'admin' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                            'bg-slate-700/50 text-slate-300 border border-slate-700'
+                          }`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 text-right flex justify-end gap-2">
+                          <button 
+                            onClick={() => { 
+                              admin.setEditingUser(user); 
+                              admin.setEditForm({ 
+                                name: user.name || "", 
+                                email: user.email || "", 
+                                role: user.role, 
+                                password: "" 
+                              }); 
+                            }} 
+                            className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded"
+                            title="Editar usuario"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(user.id, user.name)} 
+                            className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded"
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "invitations" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Invitaciones</h2>
+              <button onClick={() => setIsCreateInvitationOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Invitación
+              </button>
+            </div>
+            <SearchInput value={admin.searchInvitations} onChange={admin.setSearchInvitations} placeholder="Buscar invitación..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Tipo</th><th className="px-6 py-3.5">Estado</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.invitations.map((inv: any) => (
+                      <tr key={inv.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-semibold">{inv.invitedUser?.email}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{inv.workspace?.name || inv.space?.name || "N/A"}</td>
+                        <td className="px-6 py-3.5 capitalize text-slate-300">{inv.invitationType || "workspace"}</td>
+                        <td className="px-6 py-3.5 capitalize">{inv.status}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <button onClick={() => handleDeleteInvitation(inv.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {admin.activeTab === "invite-codes" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-bold text-white">Códigos de Invitación</h2>
+              <button onClick={() => setIsCreateCodeOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" />Crear Código
+              </button>
+            </div>
+            <SearchInput value={admin.searchCodes} onChange={admin.setSearchCodes} placeholder="Buscar código..." />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
+                    <tr><th className="px-6 py-3.5">Código</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Usos</th><th className="px-6 py-3.5">Creado por</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50 text-xs">
+                    {admin.inviteCodes.map((code: any) => (
+                      <tr key={code.id} className="hover:bg-slate-800/25">
+                        <td className="px-6 py-3.5 font-mono font-bold text-cyan-400">{code.code}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{code.workspace?.name || code.space?.name || "N/A"}</td>
+                        <td className="px-6 py-3.5">{code.usedCount} / {code.maxUses}</td>
+                        <td className="px-6 py-3.5 text-slate-400">{code.createdBy?.name}</td>
+                        <td className="px-6 py-3.5 text-right">
+                          <button onClick={() => handleDeleteCode(code.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {admin.editingUser && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-white">Editar Usuario</h3>
+              <button onClick={() => { admin.setEditingUser(null); admin.setEditForm({ name: "", email: "", role: "user", password: "" }); }} className="p-1 text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Nombre</label>
+                <input 
+                  type="text" 
+                  value={admin.editForm.name} 
+                  onChange={(e) => admin.setEditForm({...admin.editForm, name: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Email</label>
+                <input 
+                  type="email" 
+                  value={admin.editForm.email} 
+                  onChange={(e) => admin.setEditForm({...admin.editForm, email: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Rol</label>
+                <select 
+                  value={admin.editForm.role} 
+                  onChange={(e) => admin.setEditForm({...admin.editForm, role: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white"
+                >
+                  <option value="user">Usuario</option>
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Super Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Nueva Contraseña <span className="text-slate-500">(opcional)</span></label>
+                <input 
+                  type="password" 
+                  value={admin.editForm.password} 
+                  onChange={(e) => admin.setEditForm({...admin.editForm, password: e.target.value})} 
+                  placeholder="Dejar en blanco para mantener la actual"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => { admin.setEditingUser(null); admin.setEditForm({ name: "", email: "", role: "user", password: "" }); }} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded-xl">Guardar Cambios</button>
+              </div>
+            </form>
           </div>
         </div>
-      </header>
+      )}
 
-      <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 p-6 lg:p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex gap-2 border-b border-slate-800/80 overflow-x-auto pb-2 scrollbar-hide">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button key={tab.id} onClick={() => admin.setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${admin.activeTab === tab.id ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300" : "bg-slate-900/40 border-slate-800/70 text-slate-400 hover:bg-slate-900/80"}`}>
-                    <Icon className="w-4 h-4 flex-shrink-0" /><span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {admin.activeTab === "overview" && (
-              <div className="space-y-6">
-                <div className="rounded-2xl p-4 border bg-gradient-to-r from-amber-950/20 to-orange-950/20 border-amber-500/30">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                      <Crown className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">Panel de Super Administrador</h3>
-                      <p className="text-xs text-slate-400">Vista global de toda la plataforma</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-900/60 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 uppercase">Total Organizaciones</p>
-                      <p className="text-2xl font-bold text-white">{admin.orgStats.length}</p>
-                    </div>
-                    <div className="bg-slate-900/60 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 uppercase">Total Workspaces</p>
-                      <p className="text-2xl font-bold text-white">{admin.stats.totalWorkspaces}</p>
-                    </div>
-                    <div className="bg-slate-900/60 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 uppercase">Total Usuarios</p>
-                      <p className="text-2xl font-bold text-white">{admin.stats.totalUsers}</p>
-                    </div>
-                    <div className="bg-slate-900/60 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 uppercase">Total Tareas</p>
-                      <p className="text-2xl font-bold text-white">{admin.stats.totalTasks}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl">
-                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Building2 className="w-4 h-4 text-cyan-400" />Distribución de Organizaciones por Plan</h3>
-                    <div className="space-y-4">
-                      {["Free", "Pro", "Premium"].map((plan, idx) => {
-                        const count = admin.orgStats.filter((o: any) => o.plan === plan.toLowerCase()).length;
-                        const percentage = admin.orgStats.length > 0 ? (count / admin.orgStats.length) * 100 : 0;
-                        const colors = ["bg-slate-500", "bg-blue-500", "bg-purple-500"];
-                        return (
-                          <div key={plan}>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-semibold text-slate-300">{plan}</span>
-                              <span className="text-xs font-bold text-white">{count} ({percentage.toFixed(0)}%)</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                              <div className={`h-full ${colors[idx]} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl">
-                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><FolderKanban className="w-4 h-4 text-purple-400" />Workspaces por Organización</h3>
-                    <div className="space-y-3">
-                      {admin.orgStats.slice(0, 5).map((org: any) => {
-                        const wsCount = admin.workspaceStats ? admin.workspaceStats.filter((ws: any) => ws.organizationId === org.id).length : 0;
-                        return (
-                          <div key={org.id} className="flex items-center justify-between p-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center"><Building2 className="w-4 h-4 text-purple-400" /></div>
-                              <div>
-                                <p className="text-xs font-semibold text-white">{org.name}</p>
-                                <p className="text-[10px] text-slate-400 capitalize">{org.plan}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-300">{wsCount}</span>
-                              <FolderKanban className="w-3.5 h-3.5 text-slate-500" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {admin.orgStats.length === 0 && <p className="text-xs text-slate-500 text-center py-4">Sin organizaciones registradas</p>}
-                      {admin.orgStats.length > 5 && (
-                        <p className="text-xs text-slate-400 text-center pt-2">+{admin.orgStats.length - 5} organizaciones más</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+      {admin.isCreateUserOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h3 className="text-base font-bold text-white mb-4">Crear Usuario</h3>
+            <form onSubmit={(e) => { e.preventDefault(); admin.handleCreateUser(e); }} className="space-y-4">
+              <input type="text" placeholder="Nombre" value={admin.createUserForm.name} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="email" placeholder="Email" value={admin.createUserForm.email} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="password" placeholder="Contraseña" value={admin.createUserForm.password} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <select value={admin.createUserForm.role || "user"} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+                <option value="user">Usuario</option>
+                <option value="admin">Admin</option>
+                <option value="superadmin">Super Admin</option>
+              </select>
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => admin.setIsCreateUserOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded-xl">Crear</button>
               </div>
-            )}
-
-            {admin.activeTab === "workspaces" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Workspaces (Todos del sistema)</h2>
-                  <button onClick={() => setIsCreateWorkspaceOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Workspace
-                  </button>
-                </div>
-                <SearchInput value={admin.searchWorkspaces} onChange={admin.setSearchWorkspaces} placeholder="Buscar workspace por nombre o slug..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr>
-                        <th className="px-6 py-3.5">Nombre</th>
-                        <th className="px-6 py-3.5">Slug</th>
-                        <th className="px-6 py-3.5">Plan</th>
-                        <th className="px-6 py-3.5 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.workspaces.map((ws: any) => (
-                        <tr key={ws.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-semibold">{ws.name}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{ws.slug}</td>
-                          <td className="px-6 py-3.5 capitalize">{ws.plan}</td>
-                          <td className="px-6 py-3.5 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => openEditWorkspace(ws)} className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded" title="Editar workspace">
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleDeleteWorkspace(ws.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar workspace">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {admin.activeTab === "spaces" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Spaces (Todos del sistema)</h2>
-                  <button onClick={() => setIsCreateSpaceOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Space
-                  </button>
-                </div>
-                <SearchInput value={admin.searchSpaces} onChange={admin.setSearchSpaces} placeholder="Buscar space por nombre o workspace..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr>
-                        <th className="px-6 py-3.5">Nombre</th>
-                        <th className="px-6 py-3.5">Workspace</th>
-                        <th className="px-6 py-3.5">Color</th>
-                        <th className="px-6 py-3.5 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.spaces.map((space: any) => (
-                        <tr key={space.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-semibold flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: space.color }} />
-                            {space.name}
-                          </td>
-                          <td className="px-6 py-3.5 text-slate-400">{space.workspace?.name}</td>
-                          <td className="px-6 py-3.5 font-mono text-slate-400">{space.color}</td>
-                          <td className="px-6 py-3.5 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => openEditSpace(space)} className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded" title="Editar space">
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleDeleteSpace(space.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar space">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {admin.activeTab === "organizations" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Organizaciones (Todas del sistema)</h2>
-                  <button onClick={() => setIsCreateOrgOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Organización
-                  </button>
-                </div>
-                <SearchInput value={admin.searchOrgs} onChange={admin.setSearchOrgs} placeholder="Buscar organización..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr><th className="px-6 py-3.5">Nombre</th><th className="px-6 py-3.5">Slug</th><th className="px-6 py-3.5">Plan</th><th className="px-6 py-3.5 text-right">Acciones Super Admin</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.organizations.map((org: any) => (
-                        <tr key={org.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-semibold">{org.name}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{org.slug}</td>
-                          <td className="px-6 py-3.5 capitalize">{org.plan}</td>
-                          <td className="px-6 py-3.5 text-right">
-                            <div className="flex justify-end gap-2">
-                              <select value={org.plan} onChange={(e) => handleChangeOrgPlan(org.id, e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
-                                <option value="free">Free</option>
-                                <option value="pro">Pro</option>
-                                <option value="premium">Premium</option>
-                              </select>
-                              <button onClick={() => handleDeleteOrg(org.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar organización">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {admin.activeTab === "users" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Usuarios (Todos del sistema)</h2>
-                  <button onClick={() => admin.setIsCreateUserOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Usuario
-                  </button>
-                </div>
-                <SearchInput value={admin.searchUsers} onChange={admin.setSearchUsers} placeholder="Buscar usuario..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Email</th><th className="px-6 py-3.5">Rol</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.users.map((user: any) => (
-                        <tr key={user.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-semibold">{user.name}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{user.email}</td>
-                          <td className="px-6 py-3.5 capitalize">{user.role}</td>
-                          <td className="px-6 py-3.5 text-right flex justify-end gap-2">
-                            <button onClick={() => { admin.setEditingUser(user); admin.setEditForm({ name: user.name || "", email: user.email || "", role: user.role, password: "" }); }} className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded"><Edit3 className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => admin.handleDeleteUser(user.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {admin.activeTab === "invitations" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Invitaciones (Todas del sistema)</h2>
-                  <button onClick={() => setIsCreateInvitationOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Invitación
-                  </button>
-                </div>
-                <SearchInput value={admin.searchInvitations} onChange={admin.setSearchInvitations} placeholder="Buscar invitación..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Tipo</th><th className="px-6 py-3.5">Estado</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.invitations.map((inv: any) => (
-                        <tr key={inv.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-semibold">{inv.invitedUser?.email}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{inv.workspace?.name || inv.space?.name || "N/A"}</td>
-                          <td className="px-6 py-3.5 capitalize text-slate-300">{inv.invitationType || "workspace"}</td>
-                          <td className="px-6 py-3.5 capitalize">{inv.status}</td>
-                          <td className="px-6 py-3.5 text-right">
-                            <button onClick={() => handleDeleteInvitation(inv.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar invitación">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {admin.activeTab === "invite-codes" && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Códigos de Invitación (Todos del sistema)</h2>
-                  <button onClick={() => setIsCreateCodeOpen(true)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Crear Código
-                  </button>
-                </div>
-                <SearchInput value={admin.searchCodes} onChange={admin.setSearchCodes} placeholder="Buscar código..." />
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                      <tr><th className="px-6 py-3.5">Código</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Usos</th><th className="px-6 py-3.5">Creado por</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/50 text-xs">
-                      {admin.inviteCodes.map((code: any) => (
-                        <tr key={code.id} className="hover:bg-slate-800/25">
-                          <td className="px-6 py-3.5 font-mono font-bold text-cyan-400">{code.code}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{code.workspace?.name || code.space?.name || "N/A"}</td>
-                          <td className="px-6 py-3.5">{code.usedCount} / {code.maxUses}</td>
-                          <td className="px-6 py-3.5 text-slate-400">{code.createdBy?.name}</td>
-                          <td className="px-6 py-3.5 text-right">
-                            <button onClick={() => handleDeleteCode(code.id)} className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded" title="Eliminar código">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            </form>
           </div>
-        </main>
-      </div>
+        </div>
+      )}
 
       {isCreateWorkspaceOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -935,9 +1076,9 @@ export default function AdminPage() {
                 </div>
               </div>
               {newCodeForm.targetType === "workspace" ? (
-                <SearchableSelect label="Workspace" placeholder="Buscar workspace por nombre o ID..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={workspaces} />
+                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={workspaces} />
               ) : (
-                <SearchableSelect label="Space" placeholder="Buscar space por nombre o ID..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={spaces} />
+                <SearchableSelect label="Space" placeholder="Buscar space..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={spaces} />
               )}
               <input type="number" placeholder="Máximo de usos" value={newCodeForm.maxUses} onChange={(e) => setNewCodeForm({...newCodeForm, maxUses: parseInt(e.target.value) || 5})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" min="1" required />
               <div>
@@ -967,9 +1108,9 @@ export default function AdminPage() {
                 </div>
               </div>
               {newInvitationForm.targetType === "workspace" ? (
-                <SearchableSelect label="Workspace" placeholder="Buscar workspace por nombre o ID..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={workspaces} />
+                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={workspaces} />
               ) : (
-                <SearchableSelect label="Space" placeholder="Buscar space por nombre o ID..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={spaces} />
+                <SearchableSelect label="Space" placeholder="Buscar space..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={spaces} />
               )}
               <select value={newInvitationForm.role} onChange={(e) => setNewInvitationForm({...newInvitationForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                 <option value="member">Miembro</option>
@@ -977,28 +1118,6 @@ export default function AdminPage() {
               </select>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => setIsCreateInvitationOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded-xl">Crear</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {admin.isCreateUserOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-4">Crear Usuario</h3>
-            <form onSubmit={(e) => { e.preventDefault(); admin.handleCreateUser(e); }} className="space-y-4">
-              <input type="text" placeholder="Nombre" value={admin.createUserForm.name} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <input type="email" placeholder="Email" value={admin.createUserForm.email} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <input type="password" placeholder="Contraseña" value={admin.createUserForm.password} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <select value={admin.createUserForm.role || "user"} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
-                <option value="user">Usuario</option>
-                <option value="admin">Admin</option>
-                <option value="superadmin">Super Admin</option>
-              </select>
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => admin.setIsCreateUserOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
                 <button type="submit" className="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded-xl">Crear</button>
               </div>
             </form>
