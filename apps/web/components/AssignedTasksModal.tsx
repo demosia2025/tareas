@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { X, Clock, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -20,6 +19,7 @@ interface Task {
   createdAt: string;
   updatedAt: string;
   assigneeId?: string;
+  listId?: string;
   list?: {
     id: string;
     name: string;
@@ -73,7 +73,6 @@ export default function AssignedTasksModal({
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
     if (diffMins < 60) return `Hace ${diffMins} min`;
     if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
     if (diffDays < 7) return `Hace ${diffDays} día${diffDays > 1 ? "s" : ""}`;
@@ -97,16 +96,48 @@ export default function AssignedTasksModal({
   };
 
   const getPriorityLabel = (priority: number) => {
-    if (priority >= 4) return "🔥 Urgente";
+    if (priority >= 4) return " Urgente";
     if (priority === 3) return "⚡ Alta";
     if (priority === 2) return "🟡 Media";
     return "🔵 Baja";
   };
 
-  // ✅ CAMBIO CLAVE: Redirige al dashboard con el parámetro openTask
-  const handleGoToTask = (taskId: string) => {
-    router.push(`/?openTask=${taskId}`);
-    onClose();
+  // ✅ FUNCIÓN CORREGIDA: Buscar listId si no está disponible
+  const handleGoToTask = async (taskId: string, taskListId?: string) => {
+    // Si tenemos el listId, redirigir inmediatamente
+    if (taskListId) {
+      router.push(`/?listId=${taskListId}&openTask=${taskId}`);
+      onClose();
+      return;
+    }
+
+    // Si no tenemos listId, buscarlo en la tarea cargada o consultar API
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      
+      if (task?.listId) {
+        router.push(`/?listId=${task.listId}&openTask=${taskId}`);
+        onClose();
+        return;
+      }
+
+      // Consultar API para obtener el listId
+      const res = await fetch(`/api/tasks?workspaceId=${workspaceId}`);
+      if (res.ok) {
+        const allTasks = await res.json();
+        const foundTask = allTasks.find((t: any) => t.id === taskId);
+        
+        if (foundTask?.listId) {
+          router.push(`/?listId=${foundTask.listId}&openTask=${taskId}`);
+          onClose();
+        } else {
+          alert("No se encontró la lista de esta tarea");
+        }
+      }
+    } catch (error) {
+      console.error("Error al redirigir a la tarea:", error);
+      alert("Error al cargar la información de la tarea");
+    }
   };
 
   if (!isOpen) return null;
@@ -176,7 +207,6 @@ export default function AssignedTasksModal({
                       )}
                     </div>
                   </div>
-                  
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-medium text-slate-300">
                       <Clock className="w-3 h-3 text-cyan-400" />
@@ -184,7 +214,7 @@ export default function AssignedTasksModal({
                     </div>
                     {/* ✅ BOTÓN PARA IR A LA TAREA */}
                     <button
-                      onClick={() => handleGoToTask(task.id)}
+                      onClick={() => handleGoToTask(task.id, task.listId)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-all"
                       title="Ir a la tarea"
                     >

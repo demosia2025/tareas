@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import {
   Users, Search, FolderKanban, CheckCircle, Clock, AlertCircle,
-  RefreshCw
+  RefreshCw, ExternalLink
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useRouter } from "next/navigation";
@@ -21,7 +21,6 @@ export default function AssignedView() {
   const { data: session } = useSession();
   const dashboard = useDashboard();
   const router = useRouter();
-  
   const [users, setUsers] = useState<AssignedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,38 +29,31 @@ export default function AssignedView() {
 
   useEffect(() => {
     if (!dashboard.workspaceId) return;
-    
     const fetchAssigned = async () => {
       try {
         setLoading(true);
         setError("");
-        
-        // Obtener todos los miembros del workspace
         const membersRes = await fetch(`/api/workspace/${dashboard.workspaceId}/members`);
         if (!membersRes.ok) throw new Error("No se pudieron cargar los miembros");
-        
         const membersData = await membersRes.json();
-        const members = membersData.members || [];
+        const members = membersData.members || membersData || [];
 
-        // Para cada miembro, obtener sus tareas asignadas
         const usersWithTasks = await Promise.all(
           members.map(async (member: any) => {
             const tasksRes = await fetch(
               `/api/tasks?workspaceId=${dashboard.workspaceId}&assigneeId=${member.userId}`
             );
             const tasks = tasksRes.ok ? await tasksRes.json() : [];
-            
             return {
               id: member.userId,
-              name: member.user?.name || "Sin nombre",
-              email: member.user?.email || "",
-              image: member.user?.image,
+              name: member.user?.name || member.name || "Sin nombre",
+              email: member.user?.email || member.email || "",
+              image: member.user?.image || member.image,
               taskCount: Array.isArray(tasks) ? tasks.length : 0,
               tasks: Array.isArray(tasks) ? tasks : []
             };
           })
         );
-
         setUsers(usersWithTasks);
       } catch (err: any) {
         setError(err.message || "Error al cargar asignaciones");
@@ -69,7 +61,6 @@ export default function AssignedView() {
         setLoading(false);
       }
     };
-
     fetchAssigned();
   }, [dashboard.workspaceId, retryCount]);
 
@@ -101,13 +92,64 @@ export default function AssignedView() {
 
   const getPriorityLabel = (priority: number) => {
     if (priority >= 4) return "🔥 Urgente";
-    if (priority === 3) return " Alta";
+    if (priority === 3) return "🔴 Alta";
     if (priority === 2) return "🟡 Media";
-    return " Baja";
+    return "🔵 Baja";
   };
 
-  const handleGoToTask = (taskId: string) => {
-    router.push(`/?openTask=${taskId}`);
+  // ✅ FUNCIÓN CORREGIDA CON RECARGA FORZADA
+  const handleGoToTask = async (taskId: string, taskListId?: string) => {
+    console.log(" Ir a tarea:", taskId, "listId:", taskListId);
+    
+    // Si tenemos el listId, redirigir inmediatamente
+    if (taskListId) {
+      console.log("✅ Redirigiendo con listId:", taskListId);
+      // Primero cerramos cualquier modal abierto
+      dashboard.setIsModalOpen(false);
+      
+      // Redirigimos con los parámetros
+      router.push(`/?listId=${taskListId}&openTask=${taskId}`);
+      
+      // Forzamos recarga después de un pequeño delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+      return;
+    }
+
+    // Si no tenemos listId, buscarlo
+    try {
+      let foundTask: any = null;
+      for (const user of users) {
+        const task = user.tasks.find((t: any) => t.id === taskId);
+        if (task) {
+          foundTask = task;
+          break;
+        }
+      }
+
+      if (foundTask?.listId) {
+        console.log("✅ listId encontrado:", foundTask.listId);
+        dashboard.setIsModalOpen(false);
+        router.push(`/?listId=${foundTask.listId}&openTask=${taskId}`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      } else if (foundTask?.list?.id) {
+        console.log("✅ listId encontrado en list.id:", foundTask.list.id);
+        dashboard.setIsModalOpen(false);
+        router.push(`/?listId=${foundTask.list.id}&openTask=${taskId}`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      } else {
+        console.warn("⚠️ No se encontró listId");
+        alert("No se pudo encontrar la lista de esta tarea");
+      }
+    } catch (error) {
+      console.error("Error al redirigir:", error);
+      alert("Error al cargar la información");
+    }
   };
 
   return (
@@ -222,18 +264,19 @@ export default function AssignedView() {
                             <span className="text-[10px] text-slate-500">
                               {getPriorityLabel(task.priority)}
                             </span>
-                            {task.list?.name && (
+                            {task.listName && (
                               <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                📁 {task.list.name}
+                                📁 {task.listName}
                               </span>
                             )}
                           </div>
                         </div>
                         <button
-                          onClick={() => handleGoToTask(task.id)}
+                          onClick={() => handleGoToTask(task.id, task.listId || task.list?.id)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100"
                           title="Ir a la tarea"
                         >
+                          <ExternalLink className="w-3.5 h-3.5" />
                           Ver tarea
                         </button>
                       </div>

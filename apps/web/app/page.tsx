@@ -1,8 +1,8 @@
 "use client";
-import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import {
   Zap, Menu, Shield, User, LogOut, ChevronDown, LayoutDashboard,
   List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal,
@@ -29,9 +29,10 @@ import ProfileView from "@/components/ProfileView";
 
 type ActiveView = "home" | "dashboard" | "users" | "assigned" | "admin" | "profile";
 
-export default function HomePage() {
+function HomePageContent() {
   const { status, data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dashboard = useDashboard();
   usePresence();
   const { totalUnread, markAllAsRead } = useUnreadMessages(dashboard.workspaceId);
@@ -80,10 +81,10 @@ export default function HomePage() {
     }
   }, [dashboard.selectedList]);
 
+  // ✅ useSearchParams ahora está dentro de un componente que será envuelto en Suspense
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const openTaskId = params.get("openTask");
-    const urlListId = params.get("listId");
+    const openTaskId = searchParams.get("openTask");
+    const urlListId = searchParams.get("listId");
     
     if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
       const fetchAndOpenTask = async () => {
@@ -93,12 +94,33 @@ export default function HomePage() {
             const tasks = await res.json();
             const taskToOpen = tasks.find((t: any) => t.id === openTaskId);
             if (taskToOpen) {
-              if (dashboard.openEditModal) {
-                dashboard.openEditModal(taskToOpen);
-              } else {
-                (dashboard as any).setEditingTask?.(taskToOpen);
-                (dashboard as any).setIsModalOpen?.(true);
+              if (urlListId && dashboard.spaces && dashboard.spaces.length > 0) {
+                let foundList = null;
+                let foundSpace = null;
+                for (const space of dashboard.spaces) {
+                  if (space.lists) {
+                    const list = space.lists.find((l: any) => l.id === urlListId);
+                    if (list) {
+                      foundList = list;
+                      foundSpace = space;
+                      break;
+                    }
+                  }
+                }
+                if (foundList && foundSpace) {
+                  dashboard.handleListSelect({ id: foundList.id, name: foundList.name, spaceId: foundSpace.id });
+                }
               }
+              
+              setTimeout(() => {
+                if (dashboard.openEditModal) {
+                  dashboard.openEditModal(taskToOpen);
+                } else {
+                  (dashboard as any).setEditingTask?.(taskToOpen);
+                  (dashboard as any).setIsModalOpen?.(true);
+                }
+              }, 300);
+              
               window.history.replaceState({}, "", "/");
             }
           }
@@ -129,7 +151,7 @@ export default function HomePage() {
         window.history.replaceState({}, "", "/");
       }
     }
-  }, [dashboard.isModalOpen, dashboard.workspaceId, dashboard.selectedList, dashboard.spaces]);
+  }, [searchParams, dashboard.isModalOpen, dashboard.workspaceId, dashboard.selectedList, dashboard.spaces]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -323,7 +345,7 @@ export default function HomePage() {
     setIsCreatingFolder(true);
     try {
       if (!dashboard.workspaceId) {
-        alert("️ Error: No tienes un workspace activo.");
+        alert("⚠️ Error: No tienes un workspace activo.");
         setIsCreatingFolder(false);
         return;
       }
@@ -591,8 +613,6 @@ export default function HomePage() {
         </aside>
 
         <main className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 min-w-0">
-          
-          {/* ✅ VISTA: INICIO (¿Qué quieres hacer hoy?) */}
           {activeView === "home" && (
             hasWorkspace ? (
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
@@ -763,12 +783,10 @@ export default function HomePage() {
             )
           )}
 
-          {/* ✅ VISTA: DASHBOARD DE MÉTRICAS */}
           {activeView === "dashboard" && !dashboard.selectedList && (
             <DashboardView />
           )}
 
-          {/* ✅ VISTA: LISTA DE TAREAS */}
           {activeView === "dashboard" && dashboard.selectedList && (
             <>
               <div className="px-4 sm:px-6 py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
@@ -852,7 +870,6 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ✅ VISTAS: ADMIN, USUARIOS, ASIGNACIONES, PERFIL */}
           {activeView === "admin" && <AdminView isSuperAdmin={isSuperAdmin} />}
           {activeView === "users" && <UsersView />}
           {activeView === "assigned" && <AssignedView />}
@@ -860,7 +877,6 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* MODALES */}
       <TaskModal 
         isOpen={dashboard.isModalOpen} 
         onClose={() => {
@@ -1058,5 +1074,18 @@ export default function HomePage() {
       )}
       <AIAssistant />
     </div>
+  );
+}
+
+// ✅ COMPONENTE PRINCIPAL QUE ENVUELVE TODO EN SUSPENSE
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-cyan-400 border-t-transparent"></div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 }
