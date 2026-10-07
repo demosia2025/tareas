@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const session = await auth();
@@ -16,7 +18,6 @@ export async function GET() {
 
     // ✅ Super Admin: puede ver cualquier organización
     if (user?.role === "superadmin") {
-      // Obtener la primera organización del sistema (o puedes hacer que reciba un parámetro)
       const org = await prisma.organization.findFirst({
         orderBy: { createdAt: "desc" }
       });
@@ -25,13 +26,11 @@ export async function GET() {
         return NextResponse.json({ error: "No hay organizaciones" }, { status: 404 });
       }
 
-      // Contar usuarios totales en todos los workspaces de esta org
       const workspaces = await prisma.workspace.findMany({
         where: { organizationId: org.id },
         include: { members: true }
       });
 
-      // ✅ CORREGIDO: Agregado ': any' a los parámetros
       const totalUsers = workspaces.reduce((acc: any, ws: any) => acc + ws.members.length, 0);
 
       const planLimits: Record<string, { maxUsers: number; maxWorkspaces: number }> = {
@@ -83,7 +82,6 @@ export async function GET() {
       include: { members: true }
     });
 
-    // ✅ CORREGIDO: Agregado ': any' a los parámetros
     const totalUsers = workspaces.reduce((acc: any, ws: any) => acc + ws.members.length, 0);
 
     const planLimits: Record<string, { maxUsers: number; maxWorkspaces: number }> = {
@@ -120,8 +118,8 @@ export async function GET() {
   }
 }
 
-// ✅ Endpoint para cambiar plan (solo Super Admin)
-export async function POST(request: Request) {
+// Lógica unificada para procesar el cambio de plan
+async function handleUpdatePlan(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -138,10 +136,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { orgId, plan } = body;
+    const { orgId, id, plan } = body;
+    const targetId = orgId || id;
 
-    if (!orgId || !plan) {
-      return NextResponse.json({ error: "orgId y plan son requeridos" }, { status: 400 });
+    if (!targetId || !plan) {
+      return NextResponse.json({ error: "ID de organización (orgId/id) y plan son requeridos" }, { status: 400 });
     }
 
     const validPlans = ["free", "pro", "premium"];
@@ -150,7 +149,7 @@ export async function POST(request: Request) {
     }
 
     const org = await prisma.organization.update({
-      where: { id: orgId },
+      where: { id: targetId },
       data: { plan: plan.toLowerCase() }
     });
 
@@ -159,4 +158,17 @@ export async function POST(request: Request) {
     console.error("Error cambiando plan:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+// ✅ MÉTODOS HTTP PERMITIDOS PARA EL CAMBIO DE PLAN:
+export async function POST(request: Request) {
+  return handleUpdatePlan(request);
+}
+
+export async function PATCH(request: Request) {
+  return handleUpdatePlan(request);
+}
+
+export async function PUT(request: Request) {
+  return handleUpdatePlan(request);
 }
