@@ -283,13 +283,14 @@ export async function PUT(request: Request) {
     if (newId && newId !== oldId) {
       if (task.assignee?.email) {
         try {
-          await sendTaskNotification(
-            task.assignee.email,
-            task.title,
-            task.description || "",
-            task.creator?.name || "Un miembro del equipo",
-            task.id
-          );
+          // ✅ CORRECCIÓN: Usar sintaxis de objeto para SendGrid
+          await sendTaskNotification({
+            to: task.assignee.email,
+            taskTitle: task.title,
+            taskDescription: task.description || "",
+            assignedBy: task.creator?.name || "Un miembro del equipo",
+            taskId: task.id,
+          });
         } catch (emailError) {
           console.error("Error al enviar correo de notificación:", emailError);
         }
