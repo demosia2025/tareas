@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 // ✅ GET: Listar organizaciones (con filtro por rol)
 export async function GET() {
   try {
@@ -69,8 +71,8 @@ export async function GET() {
   }
 }
 
-// ✅ PATCH: Actualizar el plan de una organización (Solo Superadmin)
-export async function PATCH(request: Request) {
+// Función interna unificada para actualizar el plan
+async function handleUpdateOrganization(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -83,14 +85,15 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, plan } = body;
+    const { id, orgId, plan } = body;
+    const targetId = id || orgId;
 
-    if (!id || !plan) {
-      return NextResponse.json({ error: "ID y plan son requeridos" }, { status: 400 });
+    if (!targetId || !plan) {
+      return NextResponse.json({ error: "ID de la organización y plan son requeridos" }, { status: 400 });
     }
 
     const organization = await prisma.organization.update({
-      where: { id },
+      where: { id: targetId },
       data: { plan },
     });
 
@@ -100,4 +103,12 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-// Force redeploy
+
+// ✅ Soportar PATCH y PUT para evitar "405 Method Not Allowed"
+export async function PATCH(request: Request) {
+  return handleUpdateOrganization(request);
+}
+
+export async function PUT(request: Request) {
+  return handleUpdateOrganization(request);
+}
