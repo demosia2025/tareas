@@ -1,3 +1,4 @@
+@'
 {
   "name": "@pm-saas/web",
   "version": "0.1.0",
@@ -39,3 +40,4 @@
     "tailwindcss": "^3.4.19"
   }
 }
+'@ | Out-File -FilePath "apps\web\package.json" -Encoding UTF8
