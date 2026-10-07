@@ -1,6 +1,4 @@
-// apps/web/hooks/useUnreadMessages.ts
 "use client";
-
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
@@ -17,14 +15,12 @@ export function useUnreadMessages(workspaceId: string | null) {
   const [unreadMessages, setUnreadMessages] = useState<Map<string, UnreadMessage>>(new Map());
   const [totalUnread, setTotalUnread] = useState(0);
 
-  // ✅ Obtener el último mensaje visto por cada usuario (desde localStorage)
   const getLastSeenMessageId = useCallback((userId: string): string | null => {
     if (typeof window === 'undefined') return null;
     const key = `lastSeenMessage_${session?.user?.id}_${userId}`;
     return localStorage.getItem(key);
   }, [session?.user?.id]);
 
-  // ✅ Guardar el último mensaje visto
   const setLastSeenMessageId = useCallback((userId: string, messageId: string) => {
     if (typeof window === 'undefined') return;
     const key = `lastSeenMessage_${session?.user?.id}_${userId}`;
@@ -36,10 +32,22 @@ export function useUnreadMessages(workspaceId: string | null) {
 
     try {
       const usersRes = await fetch(`/api/workspace/${workspaceId}/connected-users`, { cache: 'no-store' });
-      if (!usersRes.ok) return;
+      
+      // ✅ Silenciar errores 403 (Forbidden) ya que es esperado si el usuario no es miembro 
+      // o es un admin sin membresía explícita en ese workspace específico.
+      if (usersRes.status === 403) {
+        setUnreadMessages(new Map());
+        setTotalUnread(0);
+        return;
+      }
+
+      if (!usersRes.ok) {
+        console.error("Error fetching connected users:", usersRes.statusText);
+        return;
+      }
+
       const usersData = await usersRes.json();
       const users = usersData.users || [];
-
       const unreadMap = new Map<string, UnreadMessage>();
       let total = 0;
 
@@ -47,40 +55,37 @@ export function useUnreadMessages(workspaceId: string | null) {
         if (user.id === session.user.id) continue;
 
         const msgRes = await fetch(`/api/messages?otherUserId=${user.id}&workspaceId=${workspaceId}`, { cache: 'no-store' });
-        if (msgRes.ok) {
-          const msgData = await msgRes.json();
-          const messages = msgData.messages || [];
-          
-          // ✅ Obtener el último mensaje visto
-          const lastSeenId = getLastSeenMessageId(user.id);
-          
-          // ✅ Filtrar solo mensajes NUEVOS (después del último visto)
-          const newMessages = lastSeenId 
-            ? messages.filter((msg: any) => {
-                const msgIndex = messages.findIndex((m: any) => m.id === lastSeenId);
-                const currentIndex = messages.findIndex((m: any) => m.id === msg.id);
-                return currentIndex > msgIndex && msg.senderId === user.id;
-              })
-            : messages.filter((msg: any) => msg.senderId === user.id);
+        if (!msgRes.ok) continue;
 
-          if (newMessages.length > 0) {
-            const lastMsg = newMessages[newMessages.length - 1];
-            unreadMap.set(user.id, {
-              senderId: user.id,
-              senderName: user.name,
-              content: lastMsg.content,
-              createdAt: lastMsg.createdAt,
-              count: newMessages.length
-            });
-            total += newMessages.length;
-          }
+        const msgData = await msgRes.json();
+        const messages = msgData.messages || [];
+
+        const lastSeenId = getLastSeenMessageId(user.id);
+        const newMessages = lastSeenId 
+          ? messages.filter((msg: any) => {
+              const msgIndex = messages.findIndex((m: any) => m.id === lastSeenId);
+              const currentIndex = messages.findIndex((m: any) => m.id === msg.id);
+              return currentIndex > msgIndex && msg.senderId === user.id;
+            })
+          : messages.filter((msg: any) => msg.senderId === user.id);
+
+        if (newMessages.length > 0) {
+          const lastMsg = newMessages[newMessages.length - 1];
+          unreadMap.set(user.id, {
+            senderId: user.id,
+            senderName: user.name,
+            content: lastMsg.content,
+            createdAt: lastMsg.createdAt,
+            count: newMessages.length
+          });
+          total += newMessages.length;
         }
       }
 
       setUnreadMessages(unreadMap);
       setTotalUnread(total);
     } catch (error) {
-      console.error("Error fetching unread messages:", error);
+      // Silenciar errores de red para no spamear la consola
     }
   }, [workspaceId, session?.user?.id, getLastSeenMessageId]);
 
@@ -92,21 +97,18 @@ export function useUnreadMessages(workspaceId: string | null) {
     return () => clearInterval(interval);
   }, [workspaceId, session?.user?.id, fetchUnread]);
 
-  // ✅ Marcar mensajes como leídos cuando se abre el chat
   const markAsRead = useCallback(async (userId: string) => {
     if (!workspaceId) return;
-    
+
     try {
       const msgRes = await fetch(`/api/messages?otherUserId=${userId}&workspaceId=${workspaceId}`, { cache: 'no-store' });
       if (msgRes.ok) {
         const msgData = await msgRes.json();
         const messages = msgData.messages || [];
-        
         if (messages.length > 0) {
           const lastMessageId = messages[messages.length - 1].id;
           setLastSeenMessageId(userId, lastMessageId);
           
-          // Actualizar estado inmediatamente
           setUnreadMessages(prev => {
             const next = new Map(prev);
             next.delete(userId);
@@ -116,7 +118,7 @@ export function useUnreadMessages(workspaceId: string | null) {
         }
       }
     } catch (error) {
-      console.error("Error marking as read:", error);
+      // Ignorar errores silenciosamente
     }
   }, [workspaceId, setLastSeenMessageId]);
 

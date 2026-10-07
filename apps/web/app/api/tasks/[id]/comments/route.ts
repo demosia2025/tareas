@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { sendCommentNotification } from "@/lib/email";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -61,6 +62,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
         include: { creator: true },
       });
+
+      // 📧 ENVIAR CORREO DE NOTIFICACIÓN DE COMENTARIO
+      try {
+        const task = await prisma.task.findUnique({
+          where: { id },
+          include: {
+            assignee: { select: { id: true, name: true, email: true } },
+            creator: { select: { id: true, name: true, email: true } },
+          },
+        });
+
+        if (task) {
+          const recipients = new Map<string, string>();
+          
+          if (task.assignee?.email && task.assignee.id !== userRecord.id) {
+            recipients.set(task.assignee.email, task.assignee.name || "Usuario");
+          }
+          if (task.creator?.email && task.creator.id !== userRecord.id) {
+            recipients.set(task.creator.email, task.creator.name || "Usuario");
+          }
+
+          // Convertimos las llaves del Map a un Array común para evitar el error de iterador en compilación de TS sin ES2015 completo
+          const recipientEmails = Array.from(recipients.keys());
+
+          for (const email of recipientEmails) {
+            await sendCommentNotification(
+              email,
+              userRecord.name || "Un usuario",
+              body,
+              task.id,
+              task.title
+            );
+            console.log(`DEBUG: Correo de comentario enviado exitosamente a: ${email}`);
+          }
+        }
+      } catch (emailError) {
+        console.error("Error enviando notificaciones de comentario:", emailError);
+      }
     }
 
     if (file) {

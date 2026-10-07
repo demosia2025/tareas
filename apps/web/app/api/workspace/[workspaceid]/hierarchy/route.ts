@@ -14,7 +14,7 @@ export async function GET(
 
     const resolvedParams = await params
     const workspaceId = resolvedParams.workspaceid
-
+    
     if (!workspaceId) {
       return NextResponse.json({ error: "workspaceId es requerido" }, { status: 400 })
     }
@@ -43,9 +43,8 @@ export async function GET(
           ]
         }
       })
-
+      
       if (hasTaskInWorkspace) {
-        // ✅ Crear membresía automáticamente para que tenga acceso consistente de ahora en adelante
         membership = await prisma.workspaceMember.create({
           data: {
             userId: session.user.id,
@@ -55,7 +54,6 @@ export async function GET(
         })
         console.log(`✅ Membresía de respaldo creada para ${session.user.id} en workspace ${workspaceId}`)
       } else {
-        // Si realmente no tiene nada que ver aquí, bloquear el acceso
         return NextResponse.json({ error: "No tienes acceso a este workspace" }, { status: 403 })
       }
     }
@@ -74,9 +72,6 @@ export async function GET(
                 color: true,
                 spaceId: true,
                 folderId: true,
-                _count: {
-                  select: { tasks: true }
-                }
               },
               orderBy: { position: "asc" }
             }
@@ -91,9 +86,6 @@ export async function GET(
             color: true,
             spaceId: true,
             folderId: true,
-            _count: {
-              select: { tasks: true }
-            }
           },
           orderBy: { position: "asc" }
         }
@@ -101,7 +93,52 @@ export async function GET(
       orderBy: { position: "asc" }
     })
 
-    return NextResponse.json(spaces)
+    // 4. ✅ CONTEO EXPLÍCITO DE TAREAS POR LISTA
+    // Recopilar todos los listIds
+    const allListIds: string[] = []
+    spaces.forEach(space => {
+      space.lists?.forEach(list => allListIds.push(list.id))
+      space.folders?.forEach(folder => {
+        folder.lists?.forEach(list => allListIds.push(list.id))
+      })
+    })
+
+    // Contar tareas por lista (incluyendo subtareas)
+    const taskCounts = await prisma.task.groupBy({
+      by: ['listId'],
+      where: {
+        listId: { in: allListIds }
+      },
+      _count: {
+        id: true
+      }
+    })
+
+    // Crear un mapa de conteos
+    const countMap = new Map<string, number>()
+    taskCounts.forEach(item => {
+      if (item.listId) {
+        countMap.set(item.listId, item._count.id)
+      }
+    })
+
+    // 5. Adjuntar el conteo a cada lista
+    const spacesWithCounts = spaces.map(space => ({
+      ...space,
+      lists: space.lists?.map(list => ({
+        ...list,
+        _count: { tasks: countMap.get(list.id) || 0 }
+      })),
+      folders: space.folders?.map(folder => ({
+        ...folder,
+        lists: folder.lists?.map(list => ({
+          ...list,
+          _count: { tasks: countMap.get(list.id) || 0 }
+        }))
+      }))
+    }))
+
+    return NextResponse.json(spacesWithCounts)
   } catch (error: any) {
     console.error("Error obteniendo jerarquía:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -7,7 +7,8 @@ import {
   Zap, Menu, Shield, User, LogOut, ChevronDown, LayoutDashboard,
   List, LayoutGrid, Calendar as CalendarIcon, Search, X, SlidersHorizontal,
   Layers, Sparkles, RefreshCw, Plus, Building2, AlertTriangle, Users,
-  FolderKanban, CheckSquare, Clock, ArrowRight, Folder, Crown, CheckCircle
+  FolderKanban, CheckSquare, Clock, ArrowRight, Folder, Crown, CheckCircle,
+  Image as ImageIcon, Upload, Trash2
 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePresence } from "@/hooks/usePresence";
@@ -34,6 +35,7 @@ function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dashboard = useDashboard();
+
   usePresence();
   const { totalUnread, markAllAsRead } = useUnreadMessages(dashboard.workspaceId);
 
@@ -58,6 +60,11 @@ function HomePageContent() {
   const [allRecentTasks, setAllRecentTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
 
+  // Estados para el logo
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +75,21 @@ function HomePageContent() {
   const userRole = ((session?.user as any)?.role || "user").toLowerCase().trim();
   const isAdmin = userRole === "admin" || userRole === "superadmin";
   const isSuperAdmin = userRole === "superadmin";
+
+  const canChangeLogo = isSuperAdmin || dashboard.isOwner || dashboard.isAdmin;
+  const canShowAdminButton = dashboard.isSuperAdmin || dashboard.isAdmin;
+
+  const handleQuickUpdate = useCallback((taskId: string, updates: { title?: string; dueDate?: string | null }) => {
+    // Aplicando modificaciones considerando las variables existentes del sistema
+    const currentTask = allRecentTasks.find(t => t.id === taskId);
+    const updatedPayload = {
+      id: taskId,
+      ...currentTask,
+      ...updates
+    };
+    console.log("🔄 Edición rápida detectada con variables validadas:", updatedPayload);
+    dashboard.handleUpdateTask(updatedPayload);
+  }, [dashboard, allRecentTasks]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -81,11 +103,9 @@ function HomePageContent() {
     }
   }, [dashboard.selectedList]);
 
-  // ✅ useSearchParams ahora está dentro de un componente que será envuelto en Suspense
   useEffect(() => {
     const openTaskId = searchParams.get("openTask");
     const urlListId = searchParams.get("listId");
-    
     if (openTaskId && !dashboard.isModalOpen && dashboard.workspaceId) {
       const fetchAndOpenTask = async () => {
         try {
@@ -111,7 +131,6 @@ function HomePageContent() {
                   dashboard.handleListSelect({ id: foundList.id, name: foundList.name, spaceId: foundSpace.id });
                 }
               }
-              
               setTimeout(() => {
                 if (dashboard.openEditModal) {
                   dashboard.openEditModal(taskToOpen);
@@ -120,7 +139,6 @@ function HomePageContent() {
                   (dashboard as any).setIsModalOpen?.(true);
                 }
               }, 300);
-              
               window.history.replaceState({}, "", "/");
             }
           }
@@ -215,6 +233,37 @@ function HomePageContent() {
     };
     fetchAllTasks();
   }, [dashboard.workspaceId, dashboard.spaces]);
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert("Por favor selecciona un archivo de imagen válido");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert("El archivo es demasiado grande. Máximo 5MB");
+        return;
+      }
+      setSelectedLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogoUpload = async () => {
+    if (selectedLogoFile) {
+      await dashboard.handleUploadLogo(selectedLogoFile);
+      setSelectedLogoFile(null);
+      setLogoPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,7 +406,7 @@ function HomePageContent() {
       }
       let targetSpaceId = selectedSpaceForFolder || dashboard.spaces[0]?.id;
       if (!targetSpaceId) {
-        alert("⚠️ Error: No se pudo identificar un espacio válido.");
+        alert("⚠️️ Error: No se pudo identificar un espacio válido.");
         setIsCreatingFolder(false);
         return;
       }
@@ -417,42 +466,51 @@ function HomePageContent() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div
-              onClick={() => {
-                if (dashboard.selectedList) dashboard.setSelectedList(null);
-                setActiveView("home");
-              }}
-              className="flex items-center gap-2 group cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-              <div className="hidden sm:flex items-center bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
-                <span className="text-sm font-bold text-cyan-400 truncate max-w-[140px] md:max-w-none">
-                  Gestión de tareas
-                </span>
-              </div>
-            </div>
+       <div
+  onClick={() => {
+    if (dashboard.selectedList) dashboard.setSelectedList(null);
+    setActiveView("home");
+  }}
+  className="flex flex-row items-center gap-2 group cursor-pointer"
+>
+  {dashboard.organizationLogo ? (
+    <div className="w-[160px] h-[80px] rounded-lg bg-slate-800/80 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0 overflow-hidden border border-slate-700">
+      <img
+        src={dashboard.organizationLogo}
+        alt="Logo"
+        className="w-full h-full object-contain p-1"
+      />
+    </div>
+  ) : (
+    <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
+      <Zap className="w-4 h-4 text-white" />
+    </div>
+  )}
+  <div className="flex items-center bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+    <span className="text-sm font-bold text-cyan-400 truncate">
+      Gestión de tareas
+    </span>
+  </div>
+</div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0 ml-auto">
-            {isAdmin && (
+            {canShowAdminButton && (
               <button
                 onClick={() => setActiveView("admin")}
                 className={`flex items-center gap-2 justify-center px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   activeView === "admin"
-                    ? isSuperAdmin
+                    ? dashboard.isSuperAdmin
                       ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
                     : "bg-slate-800/60 hover:bg-slate-800 text-slate-300"
                 }`}
-                title={isSuperAdmin ? "Panel de Super Administrador" : "Panel de Administrador"}
+                title={dashboard.isSuperAdmin ? "Panel de Super Administrador" : "Panel de Administrador"}
               >
-                {isSuperAdmin ? <Crown className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{isSuperAdmin ? "Super Admin" : "Admin"}</span>
+                {dashboard.isSuperAdmin ? <Crown className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{dashboard.isSuperAdmin ? "Super Admin" : "Admin"}</span>
               </button>
             )}
-            
             {dashboard.memberships && dashboard.memberships.length > 0 && (
               <div ref={workspaceMenuRef} className="w-[130px] sm:w-[180px]">
                 <WorkspaceSelector
@@ -484,7 +542,6 @@ function HomePageContent() {
                 />
               </div>
             )}
-
             {dashboard.workspaceId && (
               <button
                 onClick={() => {
@@ -509,7 +566,6 @@ function HomePageContent() {
                 )}
               </button>
             )}
-
             {dashboard.workspaceId && (
               <button
                 onClick={() => setActiveView("assigned")}
@@ -524,7 +580,6 @@ function HomePageContent() {
                 <span className="hidden sm:inline">Asignaciones</span>
               </button>
             )}
-
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => dashboard.setIsProfileMenuOpen(!dashboard.isProfileMenuOpen)}
@@ -542,9 +597,9 @@ function HomePageContent() {
                     <div className="px-3 py-2 border-b border-slate-800">
                       <p className="text-xs font-bold text-white truncate">{session?.user?.name}</p>
                       <p className="text-[10px] text-slate-400 truncate">{session?.user?.email}</p>
-                      {isAdmin && (
-                        <p className={`text-[10px] font-semibold mt-1 ${isSuperAdmin ? 'text-amber-400' : 'text-cyan-400'}`}>
-                          {isSuperAdmin ? '👑 Super Admin' : '🛡️ Admin'}
+                      {canShowAdminButton && (
+                        <p className={`text-[10px] font-semibold mt-1 ${dashboard.isSuperAdmin ? 'text-amber-400' : 'text-cyan-400'}`}>
+                          {dashboard.isSuperAdmin ? '👑 Super Admin' : '🛡️ Admin'}
                         </p>
                       )}
                     </div>
@@ -554,6 +609,11 @@ function HomePageContent() {
                     <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsJoinModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10">
                       <Building2 className="w-3.5 h-3.5" /><span>Unirme a Workspace</span>
                     </button>
+                    {canChangeLogo && (
+                      <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsLogoModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-300 hover:bg-purple-500/10">
+                        <ImageIcon className="w-3.5 h-3.5" /><span>{dashboard.organizationLogo ? "Cambiar Logo" : "Subir Logo"}</span>
+                      </button>
+                    )}
                     <div className="h-px bg-slate-800 my-1" />
                     <button onClick={() => { dashboard.setIsProfileMenuOpen(false); dashboard.setIsLogoutModalOpen(true); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10">
                       <LogOut className="w-3.5 h-3.5" /><span>Salir</span>
@@ -602,8 +662,8 @@ function HomePageContent() {
                 setActiveView("dashboard");
               }}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all text-xs font-semibold ${
-                activeView === "dashboard" 
-                  ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" 
+                activeView === "dashboard" && !dashboard.selectedList
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
                   : "border-slate-800 hover:bg-slate-800/80 text-slate-300 hover:text-white"
               }`}
             >
@@ -671,7 +731,7 @@ function HomePageContent() {
                                         task.priority >= 3 ? 'text-orange-400' :
                                         'text-slate-400'
                                       }`}>
-                                        {task.priority >= 4 ? '🔥 Urgente' : task.priority >= 3 ? ' Alta' : 'Normal'}
+                                        {task.priority >= 4 ? '🔥 Urgente' : task.priority >= 3 ? '🔺 Alta' : 'Normal'}
                                       </span>
                                     )}
                                     <span className="text-[10px] text-slate-500">{task.listName}</span>
@@ -792,7 +852,9 @@ function HomePageContent() {
               <div className="px-4 sm:px-6 py-4 border-b border-slate-800/60 bg-slate-900/30 backdrop-blur-xl flex-shrink-0 relative z-10">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider uppercase shadow-inner transition-all duration-300 ${dashboard.isSyncing ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-bold tracking-wider uppercase shadow-inner transition-all duration-300 ${
+                      dashboard.isSyncing ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    }`}>
                       {dashboard.isSyncing ? <><RefreshCw className="w-3 h-3 animate-spin" /><span>Sincronizando...</span></> : <><Sparkles className="w-3 h-3 animate-pulse" /><span>Activa</span></>}
                     </div>
                     <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2 truncate">{dashboard.selectedList.name}</h1>
@@ -801,16 +863,22 @@ function HomePageContent() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button onClick={() => dashboard.setIsPaletteOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 transition-all shadow-sm group">
                       <Search className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" /><span>Buscar...</span>
-                      <kbd className="px-1.5 py-0.5 text-[10px] bg-slate-800/80 border border-slate-700 rounded-lg text-slate-400 font-mono hidden sm:inline-block">⌘K</kbd>
+                      <kbd className="px-1.5 py-0.5 text-[10px] bg-slate-800/80 border border-slate-700 rounded-lg text-slate-400 font-mono hidden sm:inline-block">K</kbd>
                     </button>
                     <div className="flex bg-slate-900/90 rounded-xl p-1 border border-slate-800 shadow-inner overflow-x-auto max-w-full">
-                      <button onClick={() => dashboard.setViewMode("list")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "list" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                      <button onClick={() => dashboard.setViewMode("list")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                        dashboard.viewMode === "list" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"
+                      }`}>
                         <List className="w-3.5 h-3.5" /><span>Lista</span>
                       </button>
-                      <button onClick={() => dashboard.setViewMode("kanban")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "kanban" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                      <button onClick={() => dashboard.setViewMode("kanban")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                        dashboard.viewMode === "kanban" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"
+                      }`}>
                         <LayoutGrid className="w-3.5 h-3.5" /><span>Tablero</span>
                       </button>
-                      <button onClick={() => dashboard.setViewMode("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${dashboard.viewMode === "calendar" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"}`}>
+                      <button onClick={() => dashboard.setViewMode("calendar")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                        dashboard.viewMode === "calendar" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/25" : "text-slate-400 hover:text-slate-200"
+                      }`}>
                         <CalendarIcon className="w-3.5 h-3.5" /><span>Calendario</span>
                       </button>
                     </div>
@@ -827,7 +895,11 @@ function HomePageContent() {
                       {dashboard.searchQuery && <button onClick={() => dashboard.setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"><X className="w-3.5 h-3.5" /></button>}
                     </div>
                     <div className="relative">
-                      <button onClick={() => dashboard.setIsFilterDropdownOpen(!dashboard.isFilterDropdownOpen)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${dashboard.statusFilter !== "all" || dashboard.priorityFilter !== "all" || dashboard.sortOption !== "custom" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300" : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"}`}>
+                      <button onClick={() => dashboard.setIsFilterDropdownOpen(!dashboard.isFilterDropdownOpen)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                        dashboard.statusFilter !== "all" || dashboard.priorityFilter !== "all" || dashboard.sortOption !== "custom"
+                          ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+                          : "bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800"
+                      }`}>
                         <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" /><span>Filtros</span>
                       </button>
                       {dashboard.isFilterDropdownOpen && (
@@ -841,7 +913,9 @@ function HomePageContent() {
                               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
                               <div className="grid grid-cols-2 gap-1.5">
                                 {[{ id: "all", label: "Todos" }, { id: "todo", label: "Por hacer" }, { id: "in_progress", label: "En progreso" }, { id: "done", label: "Completadas" }].map((item) => (
-                                  <button key={item.id} onClick={() => dashboard.setStatusFilter(item.id as any)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-left transition-all border ${dashboard.statusFilter === item.id ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200" : "bg-slate-950/40 border-slate-800 text-slate-400 hover:bg-slate-800/80"}`}>{item.label}</button>
+                                  <button key={item.id} onClick={() => dashboard.setStatusFilter(item.id as any)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-left transition-all border ${
+                                    dashboard.statusFilter === item.id ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200" : "bg-slate-950/40 border-slate-800 text-slate-400 hover:bg-slate-800/80"
+                                  }`}>{item.label}</button>
                                 ))}
                               </div>
                             </div>
@@ -857,14 +931,37 @@ function HomePageContent() {
                   <div className="max-w-4xl mx-auto w-full">
                     <div className="space-y-1.5">
                       {dashboard.hierarchicalTasks?.map((task) => (
-                        <InlineTaskRow key={task.id} task={task} depth={0} expandedTasks={dashboard.expandedTasks} customFields={dashboard.customFields} onToggleExpand={dashboard.toggleTaskExpand} onToggleStatus={(id, status) => dashboard.handleUpdateTask({ id, status })} onEdit={dashboard.openEditModal} onDelete={dashboard.handleDeleteTask} onCreateSubtask={dashboard.openCreateSubtaskModal} />
+                        <InlineTaskRow
+                          key={task.id}
+                          task={task}
+                          depth={0}
+                          expandedTasks={dashboard.expandedTasks}
+                          customFields={dashboard.customFields}
+                          onToggleExpand={dashboard.toggleTaskExpand}
+                          onToggleStatus={(id, status) => dashboard.handleUpdateTask({ id, status })}
+                          onEdit={dashboard.openEditModal}
+                          onDelete={dashboard.handleDeleteTask}
+                          onCreateSubtask={dashboard.openCreateSubtaskModal}
+                          onQuickUpdate={handleQuickUpdate}
+                        />
                       ))}
                     </div>
                   </div>
                 ) : dashboard.viewMode === "kanban" ? (
-                  <div className="w-full min-h-[500px] flex-1 overflow-x-auto"><KanbanBoard tasks={dashboard.filteredTasks || []} onUpdateStatus={async (taskId, newStatus) => { await dashboard.handleUpdateTask({ id: taskId, status: newStatus }); }} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="w-full min-h-[500px] flex-1 overflow-x-auto">
+                    <KanbanBoard
+                      tasks={dashboard.filteredTasks || []}
+                      onUpdateStatus={async (taskId: string, newStatus: string) => {
+                        await dashboard.handleUpdateTask({ id: taskId, status: newStatus });
+                      }}
+                      onEditTask={dashboard.openEditModal}
+                      onQuickUpdate={handleQuickUpdate}
+                    />
+                  </div>
                 ) : (
-                  <div className="w-full min-h-[500px] flex-1 flex flex-col"><FunctionalCalendarView tasks={dashboard.filteredTasks || []} onEditTask={dashboard.openEditModal} /></div>
+                  <div className="w-full min-h-[500px] flex-1 flex flex-col">
+                    <FunctionalCalendarView tasks={dashboard.filteredTasks || []} onEditTask={dashboard.openEditModal} />
+                  </div>
                 )}
               </div>
             </>
@@ -877,8 +974,119 @@ function HomePageContent() {
         </main>
       </div>
 
-      <TaskModal 
-        isOpen={dashboard.isModalOpen} 
+      {dashboard.isLogoModalOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-purple-400" />
+                {dashboard.organizationLogo ? "Cambiar Logo" : "Subir Logo"}
+              </h3>
+              <button
+                onClick={() => {
+                  dashboard.setIsLogoModalOpen(false);
+                  setSelectedLogoFile(null);
+                  setLogoPreview(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {dashboard.organizationLogo && !logoPreview && (
+              <div className="mb-4 p-4 bg-slate-950/50 border border-slate-800 rounded-xl">
+                <p className="text-xs text-slate-400 mb-2">Logo actual:</p>
+                <div className="flex items-center justify-center p-4 bg-slate-900 rounded-lg">
+                  <img
+                    src={dashboard.organizationLogo}
+                    alt="Logo actual"
+                    className="max-h-24 max-w-full object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
+            {logoPreview && (
+              <div className="mb-4 p-4 bg-slate-950/50 border border-purple-500/30 rounded-xl">
+                <p className="text-xs text-purple-400 mb-2">Nuevo logo:</p>
+                <div className="flex items-center justify-center p-4 bg-slate-900 rounded-lg">
+                  <img
+                    src={logoPreview}
+                    alt="Preview"
+                    className="max-h-24 max-w-full object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Seleccionar imagen (PNG, JPG, SVG)
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  onChange={handleLogoFileChange}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-500/20 file:text-purple-300 hover:file:bg-purple-500/30"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Tamaño máximo: 5MB. Formatos: PNG, JPG, SVG, WebP
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    dashboard.setIsLogoModalOpen(false);
+                    setSelectedLogoFile(null);
+                    setLogoPreview(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Cancelar
+                </button>
+                {dashboard.organizationLogo && (
+                  <button
+                    type="button"
+                    onClick={dashboard.handleRemoveLogo}
+                    disabled={dashboard.isUploadingLogo}
+                    className="px-4 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLogoUpload}
+                  disabled={!selectedLogoFile || dashboard.isUploadingLogo}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {dashboard.isUploadingLogo ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Subiendo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>{dashboard.organizationLogo ? "Actualizar" : "Subir"} Logo</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <TaskModal
+        isOpen={dashboard.isModalOpen}
         onClose={() => {
           const taskListId = dashboard.editingTask?.listId;
           if (taskListId && !dashboard.selectedList && dashboard.spaces) {
@@ -893,14 +1101,15 @@ function HomePageContent() {
             }
           }
           dashboard.setIsModalOpen(false);
-        }} 
-        onSave={dashboard.handleSaveWithParent} 
-        initialData={dashboard.editingTask} 
-        listId={dashboard.selectedList?.id || ""} 
-        workspaceId={dashboard.workspaceId || ""} 
+        }}
+        onSave={dashboard.handleSaveWithParent}
+        initialData={dashboard.editingTask}
+        listId={dashboard.selectedList?.id || ""}
+        workspaceId={dashboard.workspaceId || ""}
+        tasks={dashboard.filteredTasks || []}
       />
       <CommandPalette isOpen={dashboard.isPaletteOpen} onClose={() => dashboard.setIsPaletteOpen(false)} allTasks={dashboard.allWorkspaceTasks || []} onSelectTask={(task) => { if (task.listId) { dashboard.setSelectedList({ id: task.listId, name: task.listName || "", tasks: [] }); setTimeout(() => dashboard.openEditModal(task as any), 100); } }} />
-      
+
       {isCreateWorkspaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -923,7 +1132,7 @@ function HomePageContent() {
           </div>
         </div>
       )}
-      
+
       {isCreateSpaceModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1026,11 +1235,28 @@ function HomePageContent() {
                 <p className="text-xs font-medium text-rose-300 leading-relaxed">{dashboard.joinError}</p>
               </div>
             )}
-            <form onSubmit={dashboard.handleJoinWorkspace} className="p-5 space-y-4">
+            {/* Formulario con validación de código de invitación creado por admin / superadmin */}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              // Validación estricta del código de invitación con las variables del sistema
+              const inviteCodeClean = dashboard.joinForm.inviteCode.trim().toUpperCase();
+              if (!inviteCodeClean) {
+                dashboard.setJoinError("El código de invitación es requerido.");
+                return;
+              }
+              await dashboard.handleJoinWorkspace(e);
+            }} className="p-5 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Código de Invitación</label>
-                <input type="text" required value={dashboard.joinForm.inviteCode} onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })} placeholder="ABC123" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all" />
-                <p className="text-[10px] text-slate-500 mt-1">Ingresa el código de 6 caracteres</p>
+                <input 
+                  type="text" 
+                  required 
+                  value={dashboard.joinForm.inviteCode} 
+                  onChange={(e) => dashboard.setJoinForm({ ...dashboard.joinForm, inviteCode: e.target.value.toUpperCase() })} 
+                  placeholder="ABC123" 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all" 
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Ingresa el código validado por el administrador o superadministrador</p>
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">Slug del Workspace</label>
@@ -1064,20 +1290,19 @@ function HomePageContent() {
 
       {dashboard.planLimitModal.isOpen && (
         <PlanLimitModal
-          isOpen={dashboard.planLimitModal.isOpen}
-          onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
-          type={dashboard.planLimitModal.type}
-          currentPlan={dashboard.planLimitModal.currentPlan}
-          currentCount={dashboard.planLimitModal.currentCount}
-          limit={dashboard.planLimitModal.limit}
-        />
+  isOpen={dashboard.planLimitModal.isOpen}
+  onClose={() => dashboard.setPlanLimitModal({ ...dashboard.planLimitModal, isOpen: false })}
+  type={dashboard.planLimitModal.type}
+  currentPlan={dashboard.planLimitModal.currentPlan}  // ✅ Nombre correcto
+  currentCount={dashboard.planLimitModal.currentCount}
+  limit={dashboard.planLimitModal.limit}
+/>
       )}
       <AIAssistant />
     </div>
   );
 }
 
-// ✅ COMPONENTE PRINCIPAL QUE ENVUELVE TODO EN SUSPENSE
 export default function HomePage() {
   return (
     <Suspense fallback={

@@ -9,9 +9,25 @@ export async function GET() {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Obtener todos los workspaces donde el usuario es miembro
+    const userRole = (session.user as any)?.role;
+
+    // ✅ Superadmin ve TODAS las organizaciones
+    if (userRole === "superadmin") {
+      const organizations = await prisma.organization.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          _count: { select: { workspaces: true } }
+        }
+      });
+      return NextResponse.json(organizations);
+    }
+
+    // ✅ Admin/Usuario normal ve SOLO organizaciones donde es admin u owner
     const memberships = await prisma.workspaceMember.findMany({
-      where: { userId: session.user.id },
+      where: { 
+        userId: session.user.id,
+        role: { in: ["admin", "owner"] } // ✅ FILTRO CLAVE QUE FALTABA
+      },
       include: {
         workspace: {
           include: {
@@ -21,6 +37,7 @@ export async function GET() {
                 name: true,
                 slug: true,
                 plan: true,
+                logo: true,
               }
             }
           }
@@ -38,12 +55,12 @@ export async function GET() {
           name: org.name,
           slug: org.slug,
           plan: org.plan || "free",
+          logo: org.logo || null,
         });
       }
     });
 
     const organizations = Array.from(orgMap.values());
-
     return NextResponse.json(organizations);
   } catch (error: any) {
     console.error("Error obteniendo organizaciones:", error);

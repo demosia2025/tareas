@@ -11,6 +11,7 @@ interface TaskModalProps {
   initialData?: any;
   listId?: string;
   workspaceId?: string;
+  tasks?: any[];
 }
 
 const priorityOptions = [
@@ -39,7 +40,7 @@ interface InvitedMember {
   invitedAt: string;
 }
 
-export function TaskModal({ isOpen, onClose, onSave, initialData, listId, workspaceId }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, initialData, listId, workspaceId, tasks = [] }: TaskModalProps) {
   const [activeTab, setActiveTab] = useState<"details" | "activity" | "invited">("details");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -52,6 +53,33 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
   const [invitedMembers, setInvitedMembers] = useState<InvitedMember[]>([]);
   const [loadingInvited, setLoadingInvited] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const calculateTimeLeft = () => {
+      const deadline = initialData?.dueDate ? new Date(initialData.dueDate).getTime() : new Date(initialData?.createdAt || Date.now()).getTime() + (48 * 60 * 60 * 1000);
+      const now = new Date().getTime();
+      const difference = deadline - now;
+
+      if (difference <= 0) {
+        setTimeLeft("¡Tiempo agotado!");
+        return;
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(timer);
+  }, [isOpen, initialData]);
 
   useEffect(() => {
     if (initialData) {
@@ -161,7 +189,10 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
   if (!isOpen) return null;
 
   const activeListId = selectedListId || listId;
-  const isSubtask = !!(initialData?.parentId || initialData?.parentTaskId);
+  const parentTaskId = initialData?.parentId || initialData?.parentTaskId;
+  const isSubtask = !!parentTaskId;
+  const parentTask = parentTaskId ? tasks.find((t: any) => t.id === parentTaskId) : null;
+  const parentTaskName = initialData?.parent?.title || parentTask?.title || null;
 
   // ✅ Encontrar el nombre del usuario asignado
   const assignedUser = workspaceMembers.find((m: any) => 
@@ -191,11 +222,16 @@ export function TaskModal({ isOpen, onClose, onSave, initialData, listId, worksp
             <h2 className="text-base font-bold text-white truncate">
               {initialData?.title || "Nueva Tarea"}
             </h2>
-            {assigneeId && assignedUserName && (
-              <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                <UserPlus className="w-3 h-3 text-cyan-400" />
-                <span className="text-[11px] text-cyan-300 font-medium">
-                  Tarea asignada a: <strong>{assignedUserName}</strong>
+            
+            {/* SLA Timer */}
+            <div className={`mt-2 px-3 py-1.5 rounded-lg border text-xs font-bold w-fit ${timeLeft === "¡Tiempo agotado!" ? "bg-rose-500/10 border-rose-500/50 text-rose-500" : "bg-slate-800 border-slate-700 text-slate-300"}`}>
+              ⏰ {timeLeft}
+            </div>
+
+            {parentTaskName && (
+              <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1 bg-purple-500/10 border border-purple-500/30 rounded-lg w-fit">
+                <span className="text-[11px] text-purple-300 font-medium truncate max-w-[300px]">
+                  Pertenece a tarea principal: <strong>{parentTaskName}</strong>
                 </span>
               </div>
             )}

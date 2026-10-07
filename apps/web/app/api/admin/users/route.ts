@@ -1,203 +1,286 @@
-import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 
-// ✅ OBTENER TODOS LOS USUARIOS
-export async function GET() {
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// ==========================================
+// GET: Obtener usuarios (Con blindaje de seguridad)
+// ==========================================
+export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    });
+    const currentUserRole = (session.user as any)?.role;
+    let users: any[] = [];
 
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
-    }
-
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        _count: {
-          select: {
-            memberships: true,
-            createdTasks: true
+    if (currentUserRole === "superadmin") {
+      // 👑 Super Admin puede ver a todos los usuarios excepto a otros Super Admins (por seguridad)
+      users = await prisma.user.findMany({
+        where: {
+          role: {
+            not: "superadmin"
+          }
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" }
+      });
+    } else if (currentUserRole === "admin") {
+      // 🛡️ ADMIN: Solo ver usuarios de SU organización (donde es OWNER) y NUNCA al superadmin
+      
+      // 1. Obtener los workspaces donde este usuario es estrictamente OWNER
+      const adminMemberships = await prisma.workspaceMember.findMany({
+        where: {
+          userId: session.user.id,
+          role: "owner" // 🔑 FILTRO ESTRICTO DE PROPIEDAD
+        },
+        select: {
+          workspaceId: true,
+          workspace: {
+            select: { organizationId: true }
           }
         }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+      });
+
+      const ownedWorkspaceIds = adminMemberships.map(m => m.workspaceId);
+      const orgIds = adminMemberships
+        .map(m => m.workspace?.organizationId)
+        .filter((id): id is string => Boolean(id));
+
+      if (ownedWorkspaceIds.length === 0) {
+        return NextResponse.json([]);
+      }
+
+      // 2. Obtener miembros de sus workspaces/organizaciones de propiedad, EXCLUYENDO superadmins
+      const orgMemberships = await prisma.workspaceMember.findMany({
+        where: {
+          workspace: {
+            OR: [
+              { id: { in: ownedWorkspaceIds } },
+              { organizationId: { in: orgIds } }
+            ]
+          },
+          user: {
+            role: {
+              not: "superadmin" // 🛡️ CRÍTICO: NUNCA devolver superadmins a un admin regular
+            }
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              createdAt: true,
+            }
+          }
+        }
+      });
+
+      // 3. Eliminar duplicados
+      const uniqueUsersMap = new Map();
+      orgMemberships.forEach(m => {
+        if (m.user && !uniqueUsersMap.has(m.user.id)) {
+          uniqueUsersMap.set(m.user.id, m.user);
+        }
+      });
+
+      users = Array.from(uniqueUsersMap.values());
+    } else {
+      return NextResponse.json({ error: "No tienes permisos para ver esta información" }, { status: 403 });
+    }
 
     return NextResponse.json(users);
   } catch (error: any) {
-    console.error("Error obteniendo usuarios:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error fetching users:", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
 
-// ✅ CREAR NUEVO USUARIO
-export async function POST(request: Request) {
+// ==========================================
+// PATCH: Actualizar usuario (Con protección anti-modificación de superadmin)
+// ==========================================
+export async function PATCH(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
+    const currentUserRole = (session.user as any)?.role;
+    const { searchParams } = new URL(req.url);
+    const targetUserId = searchParams.get("id");
+
+    if (!targetUserId) {
+      return NextResponse.json({ error: "Falta el ID del usuario" }, { status: 400 });
+    }
+
+    // 🛡️ Verificar si el usuario objetivo es superadmin
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true }
     });
 
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    if (!targetUser) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { name, email, password, role, workspaceId } = body;
-
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: "Nombre, email y contraseña son requeridos" }, { status: 400 });
+    if (targetUser.role === "superadmin") {
+      return NextResponse.json({ error: "No tienes permisos para modificar un Super Admin" }, { status: 403 });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return NextResponse.json({ error: "El email ya está en uso" }, { status: 400 });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: role || "user"
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true
-      }
-    });
-
-    // Si se proporciona un workspaceId, agregar al usuario como miembro
-    if (workspaceId) {
-      await prisma.workspaceMember.create({
-        data: {
-          userId: newUser.id,
-          workspaceId,
-          role: role === "admin" ? "admin" : "member"
+    // Si es admin, verificar que tenga jurisdicción sobre este usuario (misma organización propia)
+    if (currentUserRole === "admin") {
+      const adminMemberships = await prisma.workspaceMember.findMany({
+        where: {
+          userId: session.user.id,
+          role: "owner"
+        },
+        select: {
+          workspaceId: true,
+          workspace: { select: { organizationId: true } }
         }
       });
+
+      const ownedWorkspaceIds = adminMemberships.map(m => m.workspaceId);
+      const orgIds = adminMemberships
+        .map(m => m.workspace?.organizationId)
+        .filter((id): id is string => Boolean(id));
+
+      const isAuthorized = await prisma.workspaceMember.findFirst({
+        where: {
+          userId: targetUserId,
+          workspace: {
+            OR: [
+              { id: { in: ownedWorkspaceIds } },
+              { organizationId: { in: orgIds } }
+            ]
+          }
+        }
+      });
+
+      if (!isAuthorized) {
+        return NextResponse.json({ error: "No tienes permisos para modificar este usuario" }, { status: 403 });
+      }
     }
 
-    return NextResponse.json(newUser, { status: 201 });
-  } catch (error: any) {
-    console.error("Error creando usuario:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+    const body = await req.json();
+    const { name, email, role } = body;
 
-// ✅ EDITAR USUARIO (El que te estaba fallando)
-export async function PATCH(request: Request) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    // Un admin no puede promover a alguien a superadmin
+    if (currentUserRole === "admin" && role === "superadmin") {
+      return NextResponse.json({ error: "No puedes asignar el rol de Super Admin" }, { status: 403 });
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    });
-
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "ID de usuario requerido" }, { status: 400 });
-    }
-
-    const body = await request.json();
-    const { name, email, role, password } = body;
 
     const updateData: any = {};
-    if (name) updateData.name = name;
-    if (email) updateData.email = email;
-    if (role) updateData.role = role;
-    
-    // Solo hashear la contraseña si se proporciona una nueva
-    if (password && password.trim() !== "") {
-      updateData.password = await bcrypt.hash(password, 10);
-    }
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (role !== undefined) updateData.role = role;
 
     const updatedUser = await prisma.user.update({
-      where: { id },
+      where: { id: targetUserId },
       data: updateData,
       select: {
         id: true,
         name: true,
         email: true,
-        role: true
+        role: true,
       }
     });
 
     return NextResponse.json(updatedUser);
   } catch (error: any) {
-    console.error("Error actualizando usuario:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error updating user:", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }
 
-// ✅ ELIMINAR USUARIO
-export async function DELETE(request: Request) {
+// ==========================================
+// DELETE: Eliminar usuario (Con protección anti-eliminación de superadmin)
+// ==========================================
+export async function DELETE(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
+    const currentUserRole = (session.user as any)?.role;
+    const { searchParams } = new URL(req.url);
+    const targetUserId = searchParams.get("id");
+
+    if (!targetUserId) {
+      return NextResponse.json({ error: "Falta el ID del usuario" }, { status: 400 });
+    }
+
+    // 🛡️ Verificar si el usuario objetivo es superadmin
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true }
     });
 
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    if (!targetUser) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "ID de usuario requerido" }, { status: 400 });
+    if (targetUser.role === "superadmin") {
+      return NextResponse.json({ error: "No tienes permisos para eliminar un Super Admin" }, { status: 403 });
     }
 
-    // No permitir eliminar al propio usuario que está haciendo la petición
-    if (id === session.user.id) {
-      return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
+    // Si es admin, verificar que tenga jurisdicción sobre este usuario
+    if (currentUserRole === "admin") {
+      const adminMemberships = await prisma.workspaceMember.findMany({
+        where: {
+          userId: session.user.id,
+          role: "owner"
+        },
+        select: {
+          workspaceId: true,
+          workspace: { select: { organizationId: true } }
+        }
+      });
+
+      const ownedWorkspaceIds = adminMemberships.map(m => m.workspaceId);
+      const orgIds = adminMemberships
+        .map(m => m.workspace?.organizationId)
+        .filter((id): id is string => Boolean(id));
+
+      const isAuthorized = await prisma.workspaceMember.findFirst({
+        where: {
+          userId: targetUserId,
+          workspace: {
+            OR: [
+              { id: { in: ownedWorkspaceIds } },
+              { organizationId: { in: orgIds } }
+            ]
+          }
+        }
+      });
+
+      if (!isAuthorized) {
+        return NextResponse.json({ error: "No tienes permisos para eliminar este usuario" }, { status: 403 });
+      }
     }
 
     await prisma.user.delete({
-      where: { id }
+      where: { id: targetUserId }
     });
 
     return NextResponse.json({ success: true, message: "Usuario eliminado correctamente" });
   } catch (error: any) {
-    console.error("Error eliminando usuario:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error deleting user:", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
   }
 }

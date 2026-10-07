@@ -27,6 +27,7 @@ model Organization {
   slug        String          @unique
   description String?         @db.Text
   plan        String          @default("free")
+  logo        String?         
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   
@@ -244,6 +245,10 @@ model Task {
   customAttributes Json      @default("{}") @map("custom_attributes")
   tags             String[]  @default([])
   
+  // ✅ CAMPOS NUEVOS PARA RENOVACIÓN DE TAREAS
+  renewalCount     Int       @default(0) @map("renewal_count")
+  lastRenewedAt    DateTime? @map("last_renewed_at")
+  
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
   completedAt      DateTime? @map("completed_at")
@@ -288,6 +293,7 @@ model TaskMember {
   @@unique([taskId, userId])
   @@map("task_members")
 }
+
 // ==================== PROJECT ====================
 model Project {
   id          String   @id @default(uuid()) @db.Uuid

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { validateInviteCode, normalizeInviteCode } from "@/lib/rbac";
 
 export async function POST(req: Request) {
   try {
@@ -12,52 +13,34 @@ export async function POST(req: Request) {
     const { inviteCode, workspaceSlug } = await req.json();
 
     if (!inviteCode || !workspaceSlug) {
-      return NextResponse.json({ error: "Código y slug son requeridos" }, { status: 400 });
+      return NextResponse.json({ error: "Código y slug de workspace son requeridos" }, { status: 400 });
     }
 
-    // ✅ Normalizar el código a mayúsculas para la búsqueda
-    const normalizedCode = inviteCode.toUpperCase().trim();
+    const normalizedCode = normalizeInviteCode(inviteCode);
+    if (!normalizedCode || normalizedCode.length !== 6) {
+      return NextResponse.json({ error: "El código de invitación debe tener 6 caracteres alfanuméricos" }, { status: 400 });
+    }
 
     // Buscar el workspace por slug
     const workspace = await prisma.workspace.findUnique({
-      where: { slug: workspaceSlug },
-      include: {
-        inviteCodes: {
-          where: {
-            code: normalizedCode,
-            active: true,
-          },
-        },
-      },
+      where: { slug: workspaceSlug.trim().toLowerCase() },
     });
 
     if (!workspace) {
       return NextResponse.json({ error: "Workspace no encontrado" }, { status: 404 });
     }
 
-    // Verificar si el código es válido
-    const validCode = workspace.inviteCodes[0];
-    if (!validCode) {
-      return NextResponse.json({ error: "Código de invitación inválido" }, { status: 400 });
-    }
-
-    // Verificar expiración
-    if (validCode.expiresAt && new Date() > new Date(validCode.expiresAt)) {
-      return NextResponse.json({ error: "El código de invitación ha expirado" }, { status: 400 });
-    }
-
-    // Verificar límite de usos
-    if (validCode.usedCount >= validCode.maxUses) {
-      return NextResponse.json({ error: "El código de invitación ha alcanzado su límite de usos" }, { status: 400 });
+    // Validar el código contra el workspace y verificar que haya sido generado por un Admin / Super Admin legítimo
+    const validation = await validateInviteCode(normalizedCode, workspace.id);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error || "Código de invitación inválido" }, { status: 400 });
     }
 
     // Verificar si el usuario ya es miembro
-    const existingMember = await prisma.workspaceMember.findUnique({
+    const existingMember = await prisma.workspaceMember.findFirst({
       where: {
-        workspaceId_userId: {
-          workspaceId: workspace.id,
-          userId: session.user.id,
-        },
+        workspaceId: workspace.id,
+        userId: session.user.id,
       },
     });
 
@@ -65,18 +48,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ya eres miembro de este workspace" }, { status: 400 });
     }
 
-    // Agregar usuario al workspace
+    // Agregar usuario al workspace como miembro estándar
     await prisma.workspaceMember.create({
       data: {
         workspaceId: workspace.id,
         userId: session.user.id,
         role: "member",
+        organizationId: workspace.organizationId,
       },
     });
 
     // Incrementar contador de usos del código
     await prisma.inviteCode.update({
-      where: { id: validCode.id },
+      where: { id: validation.inviteCode.id },
       data: {
         usedCount: { increment: 1 },
       },

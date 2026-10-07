@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeInviteCode, generateInviteCode } from "@/lib/rbac";
 
 async function getAdminOrganization(userId: string) {
   const membership = await prisma.workspaceMember.findFirst({
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { workspaceId, maxUses = 1, expiresAt } = body;
+    const { code: rawCode, workspaceId, maxUses = 1, expiresAt } = body;
 
     if (!workspaceId) {
       return NextResponse.json({ error: "Workspace es requerido" }, { status: 400 });
@@ -67,7 +68,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Workspace no pertenece a tu organización" }, { status: 403 });
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = rawCode ? normalizeInviteCode(rawCode) : generateInviteCode();
+
+    if (code.length !== 6) {
+      return NextResponse.json({ error: "El código de invitación debe tener 6 caracteres alfanuméricos" }, { status: 400 });
+    }
 
     const inviteCode = await prisma.inviteCode.create({
       data: {

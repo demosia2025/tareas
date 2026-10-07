@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Users, Clock, ArrowLeft, Search, CheckSquare, ChevronRight, UserCircle, ExternalLink } from "lucide-react";
+import { Users, Clock, ArrowLeft, Search, CheckSquare, ChevronRight, UserCircle, ExternalLink, Calendar, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import AssignedTasksModal from "@/components/AssignedTasksModal";
 
@@ -42,6 +42,8 @@ export default function AssignedUsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'users' | 'dates'>('users');
+
   const [selectedUserForModal, setSelectedUserForModal] = useState<WorkspaceUser | null>(null);
 
   useEffect(() => {
@@ -200,9 +202,276 @@ export default function AssignedUsersPage() {
               </div>
             </div>
           </div>
+          {/* Tabs */}
+          {/* Tabs */}
+          <div className="flex gap-6 mb-6 border-b border-slate-800 px-6">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'users' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Asignaciones por usuario
+            </button>
+            <button
+              onClick={() => setActiveTab('dates')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'dates' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Asignaciones por fecha
+            </button>
+          </div>
+          {activeTab === 'users' ? (
+            <div className="space-y-4 px-6">
+              {/* Barra de búsqueda */}
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar usuario..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+
+              {loading ? (
+                <div className="text-center py-10 text-slate-500 text-sm">Cargando...</div>
+              ) : (
+                <div className="space-y-4">
+                  {users
+                    .filter(u => u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((user) => (
+                      <div key={user.id} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                        <div
+                          onClick={() => setSelectedUser(selectedUser === user.id ? null : user.id)}
+                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                              {(user.name || user.email || "U").charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-semibold text-white">{user.name || "Sin nombre"}</h3>
+                              <p className="text-[10px] text-slate-400">{user.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs font-bold text-slate-400">{user.taskCount} tareas</span>
+                            <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${selectedUser === user.id ? "rotate-90" : ""}`} />
+                          </div>
+                        </div>
+                        {selectedUser === user.id && user.tasks.length > 0 && (
+                          <div className="border-t border-slate-800 p-2 space-y-1 bg-slate-950/30">
+                            {user.tasks.map((task: any) => (
+                              <div key={task.id} className="flex items-center justify-between p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/20">
+                                <span className="text-xs text-slate-300">{task.title}</span>
+                                <button onClick={() => handleGoToTask(task.id)} className="text-[10px] text-cyan-400 hover:underline">Abrir</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="px-6 space-y-3">
+              {users.flatMap(u => u.tasks.map(t => ({ ...t, userName: u.name, userEmail: u.email })))
+                .sort((a,b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime())
+                .map((task: any) => {
+                  const isSubtask = !!(task.parentId || task.parentTaskId);
+                  return (
+                    <div key={task.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-slate-900/50 border border-slate-800 rounded-lg text-xs hover:border-slate-700 transition-all">
+                      <div className="col-span-4 font-semibold text-white">
+                        {task.title}
+                        {isSubtask && <p className="text-[9px] text-amber-500 font-normal">Subtarea dependiente</p>}
+                      </div>
+                      <div className="col-span-2 text-slate-400 truncate">{task.userName || task.userEmail}</div>
+                      <div className="col-span-2 text-slate-400">{new Date(task.assignedAt).toLocaleDateString()}</div>
+                      <div className="col-span-2 text-slate-500">{task.listName || 'Sin espacio'}</div>
+                      <div className="col-span-2 text-right">
+                        <button onClick={() => handleGoToTask(task.id)} className="text-cyan-400 font-bold hover:underline">Ver Tarea</button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+
+            {/* Tabs */}
+            <div className="flex gap-6 mb-6 border-b border-slate-800">
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'users' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Asignaciones por usuario
+              </button>
+              <button
+                onClick={() => setActiveTab('dates')}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'dates' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Asignaciones por fecha
+              </button>
+            </div>
+            {activeTab === 'users' ? (
+              <>
+                {/* Barra de búsqueda */}
+                <div className="mb-6">
+                  <div className="relative max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Buscar usuario..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50"
+                    />
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-500 border-t-transparent" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {users
+                      .filter(u => u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((user) => (
+                        <div key={user.id} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                          <div
+                            onClick={() => setSelectedUser(selectedUser === user.id ? null : user.id)}
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                                {(user.name || user.email || "U").charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-semibold text-white">{user.name || "Sin nombre"}</h3>
+                                <p className="text-[10px] text-slate-400">{user.email}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs font-bold text-slate-400">{user.taskCount} tareas</span>
+                              <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${selectedUser === user.id ? "rotate-90" : ""}`} />
+                            </div>
+                          </div>
+                          {selectedUser === user.id && user.tasks.length > 0 && (
+                            <div className="border-t border-slate-800 p-2 space-y-1 bg-slate-950/30">
+                              {user.tasks.map((task: any) => (
+                                <div key={task.id} className="flex items-center justify-between p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/20">
+                                  <span className="text-xs text-slate-300">{task.title}</span>
+                                  <button onClick={() => handleGoToTask(task.id)} className="text-[10px] text-cyan-400 hover:underline">Abrir</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                {users
+                  .flatMap(u => u.tasks.map(t => ({ ...t, userName: u.name, userEmail: u.email })))
+                  .sort((a,b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime())
+                  .map((task: any) => (
+                    <div key={task.id} className="grid grid-cols-5 gap-4 items-center p-4 bg-slate-900/50 border border-slate-800 rounded-lg text-xs">
+                      <div className="col-span-1 font-semibold text-white truncate">{task.title}</div>
+                      <div className="text-slate-400 truncate">{task.userName || task.userEmail}</div>
+                      <div className="text-slate-400">{new Date(task.assignedAt).toLocaleDateString()}</div>
+                      <div className="text-slate-500">{task.listName || 'General'}</div>
+                      <div className="text-right">
+                        <button onClick={() => handleGoToTask(task.id)} className="text-cyan-400 hover:underline">Abrir</button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+
+          <div className="max-w-7xl mx-auto px-4 pt-4 border-b border-slate-800 flex gap-4 bg-slate-900/40">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`pb-3 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'users' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Asignaciones por Usuario
+            </button>
+            <button
+              onClick={() => setActiveTab('dates')}
+              className={`pb-3 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'dates' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Asignaciones por Fecha
+            </button>
+          </div>
+
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-6">
+          {activeTab === 'users' ? (
+            <div className="space-y-4">
+              <div className="mb-6">
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Buscar usuario..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/50"
+                  />
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-2 border-cyan-500 border-t-transparent" /></div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredUsers.map((user) => (
+                    <div key={user.id} className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                      <div onClick={() => setSelectedUser(selectedUser === user.id ? null : user.id)} className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-800/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">{(user.name || "U").charAt(0).toUpperCase()}</div>
+                          <div><h3 className="text-sm font-semibold text-white">{user.name || "Sin nombre"}</h3><p className="text-[10px] text-slate-400">{user.email}</p></div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedUserForModal(user); }} className="p-2 hover:bg-cyan-500/10 rounded-lg text-cyan-400 transition-colors"><ExternalLink className="w-3.5 h-3.5" /></button>
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/60 border border-slate-700">
+                            <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
+                            <span className="text-xs font-semibold text-white">{user.taskCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {users.flatMap(u => u.tasks.map(t => ({ ...t, userName: u.name }))).sort((a,b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()).map((task: any) => (
+                <div key={task.id} className="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800 rounded-xl">
+                  <div><p className="text-sm font-semibold">{task.title}</p><p className="text-xs text-slate-400">Por: {task.userName} • {new Date(task.assignedAt).toLocaleDateString()}</p></div>
+                  <button onClick={() => handleGoToTask(task.id)} className="text-cyan-400 text-xs font-bold hover:underline">Ver Tarea</button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Barra de búsqueda */}
           <div className="mb-6">
             <div className="relative max-w-md">

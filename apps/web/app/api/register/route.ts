@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { validateInviteCode, normalizeInviteCode } from "@/lib/rbac";
 
 export async function POST(req: Request) {
   try {
@@ -17,33 +18,22 @@ export async function POST(req: Request) {
     }
 
     let workspaceIdToJoin = null;
+    let normalizedCode = "";
 
-    // Si se proporciona un código de acceso/invitación generado por admin2, lo validamos
+    // Si se proporciona un código de acceso/invitación generado por admin/admin2, lo validamos con la regla estricta
     if (inviteCode && inviteCode.trim() !== "") {
-      const validInvite = await prisma.inviteCode.findUnique({
-        where: { code: inviteCode.trim() },
-        include: { workspace: true }
-      });
-
-      if (!validInvite || !validInvite.active) {
-        return NextResponse.json({ error: "El código de acceso no es válido o está inactivo" }, { status: 400 });
+      normalizedCode = normalizeInviteCode(inviteCode);
+      const validation = await validateInviteCode(normalizedCode);
+      if (!validation.valid) {
+        return NextResponse.json({ error: validation.error || "El código de invitación no es válido" }, { status: 400 });
       }
-
-      if (validInvite.usedCount >= validInvite.maxUses) {
-        return NextResponse.json({ error: "Este código de acceso ha alcanzado su límite máximo de usos" }, { status: 400 });
-      }
-
-      if (new Date() > new Date(validInvite.expiresAt)) {
-        return NextResponse.json({ error: "El código de acceso ha expirado" }, { status: 400 });
-      }
-
-      workspaceIdToJoin = validInvite.workspaceId;
+      workspaceIdToJoin = validation.inviteCode.workspaceId;
     }
 
     // Hashear la contraseña de forma segura en el servidor
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear el usuario en la base de datos
+    // Crear el usuario en la base de datos (Invited flow -> rol user)
     const newUser = await prisma.user.create({
       data: {
         name,
@@ -53,8 +43,8 @@ export async function POST(req: Request) {
       },
     });
 
-    // Si el usuario ingresó un código válido, vincularlo automáticamente al workspace de la organización
-    if (workspaceIdToJoin) {
+    // Si el usuario ingresó un código válido, vincularlo automáticamente como "member"
+    if (workspaceIdToJoin && normalizedCode) {
       await prisma.workspaceMember.create({
         data: {
           userId: newUser.id,
@@ -65,7 +55,7 @@ export async function POST(req: Request) {
 
       // Incrementar el contador de usos del código de invitación
       await prisma.inviteCode.update({
-        where: { code: inviteCode.trim() },
+        where: { code: normalizedCode },
         data: { usedCount: { increment: 1 } },
       });
     }

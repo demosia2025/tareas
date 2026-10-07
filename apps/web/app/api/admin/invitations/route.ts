@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-// ✅ GET: Listar todas las invitaciones del sistema
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+// ✅ GET: Listar invitaciones con aislamiento por propiedad
 export async function GET() {
   try {
     const session = await auth();
@@ -15,37 +18,61 @@ export async function GET() {
       select: { role: true },
     });
     
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
+    const userRole = user?.role;
+
+    if (userRole !== "superadmin" && userRole !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
+    // 👑 SUPERADMIN: Ve todas las invitaciones del sistema
+    if (userRole === "superadmin") {
+      const invitations = await prisma.userInvitation.findMany({
+        include: {
+          workspace: {
+            select: { id: true, name: true, slug: true },
+          },
+          inviter: {
+            select: { id: true, name: true, email: true },
+          },
+          invitedUser: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ invitations });
+    }
+
+    // 🛡️ ADMIN: Ve únicamente invitaciones de sus workspaces (owner) o hechas por él
+    const adminWorkspaces = await prisma.workspaceMember.findMany({
+      where: {
+        userId: session.user.id,
+        role: "owner" // 🔑 FILTRO ESTRICTO DE PROPIEDAD
+      },
+      select: { workspaceId: true }
+    });
+
+    const ownedWorkspaceIds = adminWorkspaces.map((m) => m.workspaceId);
+
     const invitations = await prisma.userInvitation.findMany({
+      where: {
+        OR: [
+          { invitedBy: session.user.id },
+          { workspaceId: { in: ownedWorkspaceIds } }
+        ]
+      },
       include: {
         workspace: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+          select: { id: true, name: true, slug: true },
         },
         inviter: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
         invitedUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({ invitations });
@@ -65,13 +92,16 @@ export async function POST(req: Request) {
 
     const currentUserId = session.user.id;
     
-    // ✅ VERIFICAR SI EL USUARIO ES SUPER ADMIN
     const currentUser = await prisma.user.findUnique({
       where: { id: currentUserId },
       select: { role: true }
     });
 
-    const isSuperAdmin = currentUser?.role === "superadmin";
+    const userRole = currentUser?.role;
+
+    if (userRole !== "superadmin" && userRole !== "admin") {
+      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+    }
 
     const body = await req.json();
     const { email, workspaceId, role = "member" } = body;
@@ -80,19 +110,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    // ✅ BYPASS PARA SUPER ADMIN: No necesita ser miembro del workspace
-    if (!isSuperAdmin) {
-      const membership = await prisma.workspaceMember.findUnique({
+    // Validar propiedad del workspace para Admin regular
+    if (userRole === "admin") {
+      const membership = await prisma.workspaceMember.findFirst({
         where: {
-          workspaceId_userId: {
-            workspaceId,
-            userId: currentUserId,
-          },
+          workspaceId,
+          userId: currentUserId,
+          role: "owner"
         },
       });
 
-      if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
-        return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
+      if (!membership) {
+        return NextResponse.json({ error: "No tienes permisos de propietario en este workspace" }, { status: 403 });
       }
     }
 
@@ -161,7 +190,9 @@ export async function DELETE(request: Request) {
       select: { role: true }
     });
 
-    if (user?.role !== "superadmin" && user?.role !== "admin") {
+    const userRole = user?.role;
+
+    if (userRole !== "superadmin" && userRole !== "admin") {
       return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
     }
 
@@ -169,6 +200,30 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id");
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+    }
+
+    // Validar propiedad para Admin regular antes de eliminar
+    if (userRole === "admin") {
+      const targetInvitation = await prisma.userInvitation.findUnique({
+        where: { id },
+        select: { invitedBy: true, workspaceId: true }
+      });
+
+      if (!targetInvitation) {
+        return NextResponse.json({ error: "Invitación no encontrada" }, { status: 404 });
+      }
+
+      const isOwnerOfWorkspace = await prisma.workspaceMember.findFirst({
+        where: {
+          workspaceId: targetInvitation.workspaceId,
+          userId: session.user.id,
+          role: "owner"
+        }
+      });
+
+      if (targetInvitation.invitedBy !== session.user.id && !isOwnerOfWorkspace) {
+        return NextResponse.json({ error: "No tienes permisos para eliminar esta invitación" }, { status: 403 });
+      }
     }
 
     await prisma.userInvitation.delete({

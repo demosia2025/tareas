@@ -1,14 +1,13 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { Shield, ChevronDown, User, LogOut, AlertTriangle, Building2 } from "lucide-react";
+import { Shield, ChevronDown, User, LogOut, AlertTriangle, Building2, Upload, Image as ImageIcon, X } from "lucide-react";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState<"create" | "join">("create");
   const [workspaceName, setWorkspaceName] = useState("");
-  const [organizationName, setOrganizationName] = useState(""); // ✅ RESTAURADO
+  const [organizationName, setOrganizationName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -16,29 +15,95 @@ export default function OnboardingPage() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   
+  // ✅ NUEVO: Estados para el logo
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  
   const router = useRouter();
   const { data: session } = useSession();
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert("Por favor selecciona un archivo de imagen válido");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert("El archivo es demasiado grande. Máximo 5MB");
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceName.trim()) return;
-
     setIsLoading(true);
     setError("");
-
+    
     try {
+      // ✅ Primero crear la organización con el logo si existe
+      let organizationId: string | null = null;
+      
+      if (organizationName.trim()) {
+        const orgResponse = await fetch("/api/organizations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: organizationName,
+            slug: organizationName.toLowerCase().replace(/\s+/g, '-'),
+            plan: "free"
+          }),
+        });
+        
+        if (orgResponse.ok) {
+          const orgData = await orgResponse.json();
+          organizationId = orgData.id;
+          
+          // ✅ Subir logo si existe
+          if (logoFile && organizationId) {
+            setIsUploadingLogo(true);
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              const base64 = reader.result as string;
+              try {
+                await fetch(`/api/organizations/${organizationId}/logo`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ logo: base64 })
+                });
+              } catch (error) {
+                console.error("Error uploading logo:", error);
+              } finally {
+                setIsUploadingLogo(false);
+              }
+            };
+            reader.readAsDataURL(logoFile);
+          }
+        }
+      }
+      
+      // ✅ Luego crear el workspace
       const response = await fetch("/api/workspace/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: workspaceName,
-          organizationName: organizationName, // ✅ ENVIADO
+          organizationName: organizationName,
+          organizationId: organizationId,
           userId: session?.user?.id,
         }),
       });
-
+      
       const data = await response.json();
-
       if (response.ok) {
         router.push("/");
       } else {
@@ -48,17 +113,15 @@ export default function OnboardingPage() {
       setError("Error al conectar con el servidor");
       console.error(err);
     }
-
     setIsLoading(false);
   };
 
   const handleJoinWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteCode.trim() || !workspaceSlug.trim()) return;
-
     setIsLoading(true);
     setError("");
-
+    
     try {
       const response = await fetch("/api/workspace/join", {
         method: "POST",
@@ -69,9 +132,7 @@ export default function OnboardingPage() {
           userId: session?.user?.id,
         }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
         router.push("/");
       } else {
@@ -81,7 +142,6 @@ export default function OnboardingPage() {
       setError("Error al conectar con el servidor");
       console.error(err);
     }
-
     setIsLoading(false);
   };
 
@@ -101,7 +161,6 @@ export default function OnboardingPage() {
               </div>
             </div>
           </div>
-          
           <div className="flex items-center gap-3">
             <div className="relative z-50">
               <button 
@@ -117,7 +176,6 @@ export default function OnboardingPage() {
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
-              
               {isProfileMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsProfileMenuOpen(false)}></div>
@@ -154,7 +212,6 @@ export default function OnboardingPage() {
           </div>
         </div>
       </header>
-
       <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 backdrop-blur-xl shadow-2xl">
           <div className="text-center mb-8">
@@ -165,13 +222,11 @@ export default function OnboardingPage() {
                 : "Únete a un workspace existente"}
             </p>
           </div>
-
           {error && (
             <div className="mb-4 p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-medium">
               {error}
             </div>
           )}
-
           <div className="flex gap-2 mb-8">
             <button
               onClick={() => { setStep("create"); setError(""); }}
@@ -194,10 +249,9 @@ export default function OnboardingPage() {
               Unirme a Workspace
             </button>
           </div>
-
           {step === "create" && (
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
-              {/* ✅ CAMPO DE ORGANIZACIÓN RESTAURADO */}
+              {/* ✅ CAMPO DE ORGANIZACIÓN */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider flex items-center gap-2">
                   <Building2 className="w-3.5 h-3.5 text-cyan-400" />
@@ -215,7 +269,55 @@ export default function OnboardingPage() {
                   Este nombre aparecerá en el sidebar junto a tus workspaces
                 </p>
               </div>
-
+              
+              {/* ✅ NUEVO: CAMPO PARA SUBIR LOGO */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider flex items-center gap-2">
+                  <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+                  Logo de la Organización (opcional)
+                </label>
+                
+                {/* Preview del logo */}
+                {logoPreview && (
+                  <div className="mb-3 p-4 bg-slate-950/50 border border-purple-500/30 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-purple-400 font-semibold">Vista previa:</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLogoFile(null);
+                          setLogoPreview(null);
+                        }}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-center p-4 bg-slate-900 rounded-lg">
+                      <img
+                        src={logoPreview}
+                        alt="Logo preview"
+                        className="max-h-24 max-w-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Input de archivo */}
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    onChange={handleLogoFileChange}
+                    className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-500/20 file:text-purple-300 hover:file:bg-purple-500/30 focus:border-cyan-500/50 focus:outline-none transition-all"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Tamaño máximo: 5MB. Formatos: PNG, JPG, SVG, WebP
+                </p>
+              </div>
+              
+              {/* CAMPO DE WORKSPACE */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
                   Nombre del Workspace
@@ -232,17 +334,23 @@ export default function OnboardingPage() {
                   Este será tu espacio de trabajo personal o de equipo
                 </p>
               </div>
-
+              
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50"
+                disabled={isLoading || isUploadingLogo}
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isLoading ? "Creando workspace..." : "Crear Workspace"}
+                {(isLoading || isUploadingLogo) ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>{isUploadingLogo ? "Subiendo logo..." : "Creando workspace..."}</span>
+                  </>
+                ) : (
+                  "Crear Workspace"
+                )}
               </button>
             </form>
           )}
-
           {step === "join" && (
             <form onSubmit={handleJoinWorkspace} className="space-y-4">
               <div>
@@ -258,7 +366,6 @@ export default function OnboardingPage() {
                   placeholder="ABC123"
                 />
               </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
                   Slug del Workspace
@@ -275,7 +382,6 @@ export default function OnboardingPage() {
                   Pídele este dato al administrador del workspace
                 </p>
               </div>
-
               <button
                 type="submit"
                 disabled={isLoading}
@@ -285,7 +391,6 @@ export default function OnboardingPage() {
               </button>
             </form>
           )}
-
           <div className="mt-6 text-center">
             <p className="text-slate-400 text-xs">
               {step === "create"
@@ -305,7 +410,6 @@ export default function OnboardingPage() {
           </div>
         </div>
       </main>
-
       {isLogoutModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">

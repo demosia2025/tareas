@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* ==========================================
-   RESET Y BASE
-   ========================================== */
+RESET Y BASE
+========================================== */
 * {
   margin: 0;
   padding: 0;
@@ -32,8 +32,8 @@ body {
 }
 
 /* ==========================================
-   SCROLLBAR PERSONALIZADO
-   ========================================== */
+SCROLLBAR PERSONALIZADO
+========================================== */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -53,8 +53,20 @@ body {
 }
 
 /* ==========================================
-   INPUTS - Prevenir zoom en iOS
-   ========================================== */
+SCROLLBAR OCULTO (para scroll horizontal sin barra visible)
+========================================== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================
+INPUTS - Prevenir zoom en iOS
+========================================== */
 input, textarea, select {
   font-size: 16px;
 }
@@ -66,8 +78,8 @@ input, textarea, select {
 }
 
 /* ==========================================
-   HEADER RESPONSIVO
-   ========================================== */
+HEADER RESPONSIVO
+========================================== */
 header {
   min-height: 56px;
   width: 100%;
@@ -80,8 +92,8 @@ header {
 }
 
 /* ==========================================
-   SIDEBAR RESPONSIVO
-   ========================================== */
+SIDEBAR RESPONSIVO
+========================================== */
 aside {
   width: 260px;
 }
@@ -93,16 +105,16 @@ aside {
 }
 
 /* ==========================================
-   MAIN CONTENT
-   ========================================== */
+MAIN CONTENT
+========================================== */
 main {
   min-width: 0;
   flex: 1;
 }
 
 /* ==========================================
-   MÓVIL (< 768px)
-   ========================================== */
+MÓVIL (< 768px)
+========================================== */
 @media (max-width: 767px) {
   /* Forzar que nada se salga de la pantalla */
   html, body, #__next {
@@ -155,8 +167,8 @@ main {
 }
 
 /* ==========================================
-   MÓVIL PEQUEÑO (< 480px)
-   ========================================== */
+MÓVIL PEQUEÑO (< 480px)
+========================================== */
 @media (max-width: 479px) {
   header {
     min-height: 44px;
@@ -169,8 +181,8 @@ main {
 }
 
 /* ==========================================
-   DESKTOP (> 768px)
-   ========================================== */
+DESKTOP (> 768px)
+========================================== */
 @media (min-width: 768px) {
   main {
     overflow-y: auto;
@@ -179,8 +191,8 @@ main {
 }
 
 /* ==========================================
-   UTILIDADES RESPONSIVAS
-   ========================================== */
+UTILIDADES RESPONSIVAS
+========================================== */
 /* Prevenir desbordamiento de imágenes */
 img, video {
   max-width: 100%;

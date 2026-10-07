@@ -4,19 +4,26 @@ import { useSession } from "next-auth/react";
 import {
   Users, FolderKanban, Layers, Building2,
   Plus, Trash2, Edit3, Search, BarChart3, Key, UserPlus, X,
-  Crown, Shield
+  Crown, Shield, CheckSquare
 } from "lucide-react";
 import { useAdminDashboard } from "@/hooks/useAdminDashboard";
+import AdminTasksTab from "@/components/AdminTasksTab";
 
-// ==========================================
-// COMPONENTES REUTILIZABLES
-// ==========================================
 const SearchInput = ({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) => (
   <div className="relative max-w-sm">
     <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-    <input type="text" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-slate-900/60 border border-slate-800/80 rounded-xl pl-10 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all" />
-    {value && <button onClick={() => onChange("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"> <X className="w-3.5 h-3.5" /> </button>}
+    <input 
+      type="text" 
+      placeholder={placeholder} 
+      value={value} 
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-slate-900/60 border border-slate-800/80 rounded-xl pl-10 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition-all" 
+    />
+    {value && (
+      <button onClick={() => onChange("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    )}
   </div>
 );
 
@@ -29,6 +36,7 @@ const SearchableSelect = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -38,11 +46,14 @@ const SearchableSelect = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
   const filteredItems = items.filter(item =>
     item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
   const selectedItem = items.find(item => item.id === value);
+
   return (
     <div className="space-y-1" ref={containerRef}>
       {label && (
@@ -84,9 +95,6 @@ const SearchableSelect = ({
   );
 };
 
-// ==========================================
-// COMPONENTE PRINCIPAL
-// ==========================================
 export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const { data: session } = useSession();
   const admin = useAdminDashboard();
@@ -125,14 +133,13 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
   const [isCreateCodeOpen, setIsCreateCodeOpen] = useState(false);
   const [isCreateInvitationOpen, setIsCreateInvitationOpen] = useState(false);
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
-  
+
   const [newOrgForm, setNewOrgForm] = useState({ name: "", slug: "", plan: "free", description: "" });
   const [newSpaceForm, setNewSpaceForm] = useState({ name: "", workspaceId: "", description: "", color: "#8b5cf6" });
   const [newCodeForm, setNewCodeForm] = useState({ targetId: "", targetType: "workspace", maxUses: 5, expiresAt: "" });
   const [newInvitationForm, setNewInvitationForm] = useState({ email: "", targetId: "", targetType: "workspace", role: "member" });
   const [newWorkspaceForm, setNewWorkspaceForm] = useState({ name: "", organizationId: "", plan: "free" });
 
-  // ✅ GENERADOR DE CÓDIGO UNIFICADO: 6 caracteres alfanuméricos en mayúsculas
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -143,6 +150,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
   };
 
   const generateShortId = (length: number = 6) => Math.floor(Math.pow(10, length - 1) + Math.random() * 9 * Math.pow(10, length - 1)).toString();
+  
   const generateRandomSlug = (name: string) => {
     const randomNum = Math.floor(Math.random() * 10000);
     return `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${randomNum}`;
@@ -153,7 +161,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
     setEditWorkspaceForm({ name: ws.name, plan: ws.plan, slug: ws.slug });
     setIsEditWorkspaceOpen(true);
   };
-  
+
   const openEditSpace = (space: any) => {
     setEditingSpace(space);
     setEditSpaceForm({ name: space.name, color: space.color || "#8b5cf6", description: space.description || "" });
@@ -163,11 +171,15 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!admin.editingUser) return;
+    if (admin.editingUser.role === "superadmin") {
+      alert("⛔ No puedes editar a un Super Admin. Esta cuenta está protegida.");
+      return;
+    }
     try {
-      const body: any = { 
+      const body: any = {
         name: admin.editForm.name,
         email: admin.editForm.email,
-        role: admin.editForm.role 
+        role: admin.editForm.role
       };
       if (admin.editForm.password && admin.editForm.password.trim() !== "") {
         body.password = admin.editForm.password;
@@ -193,6 +205,11 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
+    const userToDelete = admin.users.find((u: any) => u.id === userId);
+    if (userToDelete?.role === "superadmin") {
+      alert("⛔ No puedes eliminar a un Super Admin. Esta cuenta está protegida.");
+      return;
+    }
     if (!confirm(`¿Estás seguro de eliminar al usuario "${userName}"? Esta acción no se puede deshacer.`)) return;
     try {
       const res = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
@@ -397,7 +414,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          code: generateRandomCode(), // ✅ Código unificado de 6 caracteres
+          code: generateRandomCode(),
           workspaceId: newCodeForm.targetType === "workspace" ? newCodeForm.targetId : null,
           spaceId: newCodeForm.targetType === "space" ? newCodeForm.targetId : null,
           maxUses: newCodeForm.maxUses,
@@ -437,7 +454,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
         })
       });
       if (res.ok) {
-        if (admin.fetchData) await admin.fetchData();
+        if (admin.fetchData) await admin.fetchData(); 
         setIsCreateInvitationOpen(false);
         setNewInvitationForm({ email: "", targetId: "", targetType: "workspace", role: "member" });
         alert("✅ Invitación creada");
@@ -450,12 +467,13 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
     }
   };
 
+  // 🔑 FIX: Se corrige el endpoint llamando a /api/admin/organizations con PATCH
   const handleChangeOrgPlan = async (orgId: string, newPlan: string) => {
     try {
-      const res = await fetch("/api/admin/organizations/plan", {
-        method: "POST",
+      const res = await fetch("/api/admin/organizations", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgId, plan: newPlan })
+        body: JSON.stringify({ id: orgId, plan: newPlan })
       });
       if (res.ok) {
         alert("✅ Plan actualizado correctamente");
@@ -490,7 +508,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
     </div>
   );
-  
+
   if (!admin.isAdmin) return (
     <div className="h-full flex items-center justify-center text-red-500">
       No tienes permisos de Administrador
@@ -504,7 +522,8 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
     { id: "organizations", label: "Organizaciones", icon: Building2 },
     { id: "users", label: "Usuarios", icon: Users },
     { id: "invitations", label: "Invitaciones", icon: UserPlus },
-    { id: "invite-codes", label: "Códigos", icon: Key }
+    { id: "invite-codes", label: "Códigos", icon: Key },
+    { id: "tasks", label: "Tareas", icon: CheckSquare }
   ];
 
   return (
@@ -526,8 +545,8 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
                 {isSuperAdmin ? "Panel de Super Administrador" : "Panel de Administrador"}
               </h1>
               <p className="text-xs text-slate-400">
-                {isSuperAdmin 
-                  ? "Acceso total a todas las organizaciones, workspaces y usuarios del sistema" 
+                {isSuperAdmin
+                  ? "Acceso total a todas las organizaciones, workspaces y usuarios del sistema"
                   : "Gestión de workspaces, espacios y usuarios"}
               </p>
             </div>
@@ -543,11 +562,11 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button 
-                key={tab.id} 
+              <button
+                key={tab.id}
                 onClick={() => admin.setActiveTab(tab.id as any)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
-                  admin.activeTab === tab.id 
+                  admin.activeTab === tab.id
                     ? isSuperAdmin && tab.id === "overview"
                       ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
                       : "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
@@ -561,22 +580,32 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           })}
         </div>
 
-        {admin.activeTab === "overview" && isSuperAdmin && (
+        {admin.activeTab === "overview" && (
           <div className="space-y-6">
-            <div className="rounded-2xl p-4 border bg-gradient-to-r from-amber-950/20 to-orange-950/20 border-amber-500/30">
+            <div className={`rounded-2xl p-4 border ${
+              isSuperAdmin 
+                ? "bg-gradient-to-r from-amber-950/20 to-orange-950/20 border-amber-500/30"
+                : "bg-gradient-to-r from-cyan-950/20 to-blue-950/20 border-cyan-500/30"
+            }`}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                  <Crown className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-xl ${
+                  isSuperAdmin ? "bg-amber-500/20 text-amber-400" : "bg-cyan-500/20 text-cyan-400"
+                } flex items-center justify-center`}>
+                  {isSuperAdmin ? <Crown className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Vista Global del Sistema</h3>
-                  <p className="text-xs text-slate-400">Métricas de toda la plataforma</p>
+                  <h3 className="text-sm font-bold text-white">
+                    {isSuperAdmin ? "Vista Global del Sistema" : "Métricas de tu Organización"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isSuperAdmin ? "Métricas de toda la plataforma" : "Resumen de tu organización"}
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-slate-900/60 rounded-xl p-3">
                   <p className="text-[10px] text-slate-400 uppercase">Total Organizaciones</p>
-                  <p className="text-2xl font-bold text-white">{admin.orgStats.length}</p>
+                  <p className="text-2xl font-bold text-white">{admin.stats.totalOrganizations || admin.orgStats.length}</p>
                 </div>
                 <div className="bg-slate-900/60 rounded-xl p-3">
                   <p className="text-[10px] text-slate-400 uppercase">Total Workspaces</p>
@@ -688,7 +717,7 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           </div>
         )}
 
-        {admin.activeTab === "organizations" && isSuperAdmin && (
+        {admin.activeTab === "organizations" && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">Organizaciones</h2>
@@ -701,7 +730,12 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[600px]">
                   <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                    <tr><th className="px-6 py-3.5">Nombre</th><th className="px-6 py-3.5">Slug</th><th className="px-6 py-3.5">Plan</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                    <tr>
+                      <th className="px-6 py-3.5">Nombre</th>
+                      <th className="px-6 py-3.5">Slug</th>
+                      <th className="px-6 py-3.5">Plan</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-xs">
                     {admin.organizations.map((org: any) => (
@@ -743,7 +777,12 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[600px]">
                   <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                    <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Email</th><th className="px-6 py-3.5">Rol</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                    <tr>
+                      <th className="px-6 py-3.5">Usuario</th>
+                      <th className="px-6 py-3.5">Email</th>
+                      <th className="px-6 py-3.5">Rol</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-xs">
                     {admin.users.map((user: any) => (
@@ -759,29 +798,32 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
                             {user.role}
                           </span>
                         </td>
-                        <td className="px-6 py-3.5 text-right flex justify-end gap-2">
-                          <button 
-                            onClick={() => { 
-                              admin.setEditingUser(user); 
-                              admin.setEditForm({ 
-                                name: user.name || "", 
-                                email: user.email || "", 
-                                role: user.role, 
-                                password: "" 
-                              }); 
-                            }} 
-                            className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded"
-                            title="Editar usuario"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteUser(user.id, user.name)} 
-                            className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded"
-                            title="Eliminar usuario"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex justify-end gap-2">
+                            {user.role === "superadmin" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <Crown className="w-3 h-3" />
+                                Protegido
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => admin.openEditUser(user)}
+                                  className="text-cyan-400 hover:bg-cyan-500/10 p-1.5 rounded"
+                                  title="Editar usuario"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.name)}
+                                  className="text-rose-400 hover:bg-rose-500/10 p-1.5 rounded"
+                                  title="Eliminar usuario"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -805,7 +847,13 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[700px]">
                   <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                    <tr><th className="px-6 py-3.5">Usuario</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Tipo</th><th className="px-6 py-3.5">Estado</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                    <tr>
+                      <th className="px-6 py-3.5">Usuario</th>
+                      <th className="px-6 py-3.5">Workspace/Space</th>
+                      <th className="px-6 py-3.5">Tipo</th>
+                      <th className="px-6 py-3.5">Estado</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-xs">
                     {admin.invitations.map((inv: any) => (
@@ -841,7 +889,13 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[700px]">
                   <thead className="bg-slate-950/50 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase">
-                    <tr><th className="px-6 py-3.5">Código</th><th className="px-6 py-3.5">Workspace/Space</th><th className="px-6 py-3.5">Usos</th><th className="px-6 py-3.5">Creado por</th><th className="px-6 py-3.5 text-right">Acciones</th></tr>
+                    <tr>
+                      <th className="px-6 py-3.5">Código</th>
+                      <th className="px-6 py-3.5">Workspace/Space</th>
+                      <th className="px-6 py-3.5">Usos</th>
+                      <th className="px-6 py-3.5">Creado por</th>
+                      <th className="px-6 py-3.5 text-right">Acciones</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-xs">
                     {admin.inviteCodes.map((code: any) => (
@@ -863,8 +917,16 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
             </div>
           </div>
         )}
+
+        {/* 🚀 VISTA INDEPENDIENTE DE TAREAS */}
+        {admin.activeTab === "tasks" && (
+          <div className="w-full">
+            <AdminTasksTab />
+          </div>
+        )}
       </div>
 
+      {/* Modales de edición y creación */}
       {admin.editingUser && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
@@ -877,45 +939,23 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Nombre</label>
-                <input 
-                  type="text" 
-                  value={admin.editForm.name} 
-                  onChange={(e) => admin.setEditForm({...admin.editForm, name: e.target.value})} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
-                  required 
-                />
+                <input type="text" value={admin.editForm.name} onChange={(e) => admin.setEditForm({ ...admin.editForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Email</label>
-                <input 
-                  type="email" 
-                  value={admin.editForm.email} 
-                  onChange={(e) => admin.setEditForm({...admin.editForm, email: e.target.value})} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
-                  required 
-                />
+                <input type="email" value={admin.editForm.email} onChange={(e) => admin.setEditForm({ ...admin.editForm, email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Rol</label>
-                <select 
-                  value={admin.editForm.role} 
-                  onChange={(e) => admin.setEditForm({...admin.editForm, role: e.target.value})} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white"
-                >
+                <select value={admin.editForm.role} onChange={(e) => admin.setEditForm({ ...admin.editForm, role: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                   <option value="user">Usuario</option>
                   <option value="admin">Admin</option>
-                  <option value="superadmin">Super Admin</option>
+                  {isSuperAdmin && <option value="superadmin">Super Admin</option>}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Nueva Contraseña <span className="text-slate-500">(opcional)</span></label>
-                <input 
-                  type="password" 
-                  value={admin.editForm.password} 
-                  onChange={(e) => admin.setEditForm({...admin.editForm, password: e.target.value})} 
-                  placeholder="Dejar en blanco para mantener la actual"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" 
-                />
+                <input type="password" value={admin.editForm.password} onChange={(e) => admin.setEditForm({ ...admin.editForm, password: e.target.value })} placeholder="Dejar en blanco para mantener la actual" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" />
               </div>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => { admin.setEditingUser(null); admin.setEditForm({ name: "", email: "", role: "user", password: "" }); }} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
@@ -931,13 +971,13 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-base font-bold text-white mb-4">Crear Usuario</h3>
             <form onSubmit={(e) => { e.preventDefault(); admin.handleCreateUser(e); }} className="space-y-4">
-              <input type="text" placeholder="Nombre" value={admin.createUserForm.name} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <input type="email" placeholder="Email" value={admin.createUserForm.email} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <input type="password" placeholder="Contraseña" value={admin.createUserForm.password} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <select value={admin.createUserForm.role || "user"} onChange={(e) => admin.setCreateUserForm({...admin.createUserForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+              <input type="text" placeholder="Nombre" value={admin.createUserForm.name} onChange={(e) => admin.setCreateUserForm({ ...admin.createUserForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="email" placeholder="Email" value={admin.createUserForm.email} onChange={(e) => admin.setCreateUserForm({ ...admin.createUserForm, email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="password" placeholder="Contraseña" value={admin.createUserForm.password} onChange={(e) => admin.setCreateUserForm({ ...admin.createUserForm, password: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <select value={admin.createUserForm.role || "user"} onChange={(e) => admin.setCreateUserForm({ ...admin.createUserForm, role: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                 <option value="user">Usuario</option>
                 <option value="admin">Admin</option>
-                <option value="superadmin">Super Admin</option>
+                {isSuperAdmin && <option value="superadmin">Super Admin</option>}
               </select>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => admin.setIsCreateUserOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
@@ -953,9 +993,9 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-base font-bold text-white mb-4">Crear Workspace</h3>
             <form onSubmit={handleCreateWorkspace} className="space-y-4">
-              <input type="text" placeholder="Nombre" value={newWorkspaceForm.name} onChange={(e) => setNewWorkspaceForm({...newWorkspaceForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <SearchableSelect label="Organización" placeholder="Buscar organización..." value={newWorkspaceForm.organizationId} onChange={(id) => setNewWorkspaceForm({...newWorkspaceForm, organizationId: id})} items={organizations} optional={true} />
-              <select value={newWorkspaceForm.plan} onChange={(e) => setNewWorkspaceForm({...newWorkspaceForm, plan: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+              <input type="text" placeholder="Nombre" value={newWorkspaceForm.name} onChange={(e) => setNewWorkspaceForm({ ...newWorkspaceForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <SearchableSelect label="Organización" placeholder="Buscar organización..." value={newWorkspaceForm.organizationId} onChange={(id) => setNewWorkspaceForm({ ...newWorkspaceForm, organizationId: id })} items={organizations} optional={true} />
+              <select value={newWorkspaceForm.plan} onChange={(e) => setNewWorkspaceForm({ ...newWorkspaceForm, plan: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                 <option value="free">Free</option>
                 <option value="pro">Pro</option>
                 <option value="premium">Premium</option>
@@ -976,15 +1016,15 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
             <form onSubmit={handleUpdateWorkspace} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Nombre</label>
-                <input type="text" value={editWorkspaceForm.name} onChange={(e) => setEditWorkspaceForm({...editWorkspaceForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+                <input type="text" value={editWorkspaceForm.name} onChange={(e) => setEditWorkspaceForm({ ...editWorkspaceForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Slug</label>
-                <input type="text" value={editWorkspaceForm.slug} onChange={(e) => setEditWorkspaceForm({...editWorkspaceForm, slug: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+                <input type="text" value={editWorkspaceForm.slug} onChange={(e) => setEditWorkspaceForm({ ...editWorkspaceForm, slug: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Plan</label>
-                <select value={editWorkspaceForm.plan} onChange={(e) => setEditWorkspaceForm({...editWorkspaceForm, plan: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+                <select value={editWorkspaceForm.plan} onChange={(e) => setEditWorkspaceForm({ ...editWorkspaceForm, plan: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                   <option value="free">Free</option>
                   <option value="pro">Pro</option>
                   <option value="premium">Premium</option>
@@ -1004,9 +1044,9 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-base font-bold text-white mb-4">Crear Organización</h3>
             <form onSubmit={handleCreateOrganization} className="space-y-4">
-              <input type="text" placeholder="Nombre" value={newOrgForm.name} onChange={(e) => setNewOrgForm({...newOrgForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <input type="text" placeholder="Slug (opcional)" value={newOrgForm.slug} onChange={(e) => setNewOrgForm({...newOrgForm, slug: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" />
-              <select value={newOrgForm.plan} onChange={(e) => setNewOrgForm({...newOrgForm, plan: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+              <input type="text" placeholder="Nombre" value={newOrgForm.name} onChange={(e) => setNewOrgForm({ ...newOrgForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="text" placeholder="Slug (opcional)" value={newOrgForm.slug} onChange={(e) => setNewOrgForm({ ...newOrgForm, slug: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" />
+              <select value={newOrgForm.plan} onChange={(e) => setNewOrgForm({ ...newOrgForm, plan: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                 <option value="free">Free</option>
                 <option value="pro">Pro</option>
                 <option value="premium">Premium</option>
@@ -1025,9 +1065,9 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-base font-bold text-white mb-4">Crear Space</h3>
             <form onSubmit={handleCreateSpace} className="space-y-4">
-              <input type="text" placeholder="Nombre" value={newSpaceForm.name} onChange={(e) => setNewSpaceForm({...newSpaceForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
-              <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newSpaceForm.workspaceId} onChange={(id) => setNewSpaceForm({...newSpaceForm, workspaceId: id})} items={workspaces} optional={true} />
-              <input type="color" value={newSpaceForm.color} onChange={(e) => setNewSpaceForm({...newSpaceForm, color: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5" />
+              <input type="text" placeholder="Nombre" value={newSpaceForm.name} onChange={(e) => setNewSpaceForm({ ...newSpaceForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newSpaceForm.workspaceId} onChange={(id) => setNewSpaceForm({ ...newSpaceForm, workspaceId: id })} items={workspaces} optional={true} />
+              <input type="color" value={newSpaceForm.color} onChange={(e) => setNewSpaceForm({ ...newSpaceForm, color: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5" />
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => setIsCreateSpaceOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
                 <button type="submit" className="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded-xl">Crear</button>
@@ -1044,15 +1084,15 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
             <form onSubmit={handleUpdateSpace} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Nombre</label>
-                <input type="text" value={editSpaceForm.name} onChange={(e) => setEditSpaceForm({...editSpaceForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+                <input type="text" value={editSpaceForm.name} onChange={(e) => setEditSpaceForm({ ...editSpaceForm, name: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Descripción</label>
-                <textarea value={editSpaceForm.description} onChange={(e) => setEditSpaceForm({...editSpaceForm, description: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" rows={3} />
+                <textarea value={editSpaceForm.description} onChange={(e) => setEditSpaceForm({ ...editSpaceForm, description: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" rows={3} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Color</label>
-                <input type="color" value={editSpaceForm.color} onChange={(e) => setEditSpaceForm({...editSpaceForm, color: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5" />
+                <input type="color" value={editSpaceForm.color} onChange={(e) => setEditSpaceForm({ ...editSpaceForm, color: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5" />
               </div>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => setIsEditSpaceOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
@@ -1071,19 +1111,19 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">Tipo de destino</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setNewCodeForm({...newCodeForm, targetType: "workspace"})} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newCodeForm.targetType === "workspace" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Workspace</button>
-                  <button type="button" onClick={() => setNewCodeForm({...newCodeForm, targetType: "space"})} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newCodeForm.targetType === "space" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Space</button>
+                  <button type="button" onClick={() => setNewCodeForm({ ...newCodeForm, targetType: "workspace" })} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newCodeForm.targetType === "workspace" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Workspace</button>
+                  <button type="button" onClick={() => setNewCodeForm({ ...newCodeForm, targetType: "space" })} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newCodeForm.targetType === "space" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Space</button>
                 </div>
               </div>
               {newCodeForm.targetType === "workspace" ? (
-                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={workspaces} />
+                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({ ...newCodeForm, targetId: id })} items={workspaces} />
               ) : (
-                <SearchableSelect label="Space" placeholder="Buscar space..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({...newCodeForm, targetId: id})} items={spaces} />
+                <SearchableSelect label="Space" placeholder="Buscar space..." value={newCodeForm.targetId} onChange={(id) => setNewCodeForm({ ...newCodeForm, targetId: id })} items={spaces} />
               )}
-              <input type="number" placeholder="Máximo de usos" value={newCodeForm.maxUses} onChange={(e) => setNewCodeForm({...newCodeForm, maxUses: parseInt(e.target.value) || 5})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" min="1" required />
+              <input type="number" placeholder="Máximo de usos" value={newCodeForm.maxUses} onChange={(e) => setNewCodeForm({ ...newCodeForm, maxUses: parseInt(e.target.value) || 5 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" min="1" required />
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Fecha de expiración (opcional)</label>
-                <input type="datetime-local" value={newCodeForm.expiresAt} onChange={(e) => setNewCodeForm({...newCodeForm, expiresAt: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" />
+                <input type="datetime-local" value={newCodeForm.expiresAt} onChange={(e) => setNewCodeForm({ ...newCodeForm, expiresAt: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" />
               </div>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => setIsCreateCodeOpen(false)} className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl">Cancelar</button>
@@ -1099,20 +1139,20 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-base font-bold text-white mb-4">Crear Invitación</h3>
             <form onSubmit={handleCreateInvitation} className="space-y-4">
-              <input type="email" placeholder="Email del usuario" value={newInvitationForm.email} onChange={(e) => setNewInvitationForm({...newInvitationForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
+              <input type="email" placeholder="Email del usuario" value={newInvitationForm.email} onChange={(e) => setNewInvitationForm({ ...newInvitationForm, email: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white" required />
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2">Tipo de destino</label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setNewInvitationForm({...newInvitationForm, targetType: "workspace"})} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newInvitationForm.targetType === "workspace" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Workspace</button>
-                  <button type="button" onClick={() => setNewInvitationForm({...newInvitationForm, targetType: "space"})} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newInvitationForm.targetType === "space" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Space</button>
+                  <button type="button" onClick={() => setNewInvitationForm({ ...newInvitationForm, targetType: "workspace" })} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newInvitationForm.targetType === "workspace" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Workspace</button>
+                  <button type="button" onClick={() => setNewInvitationForm({ ...newInvitationForm, targetType: "space" })} className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${newInvitationForm.targetType === "space" ? "bg-cyan-500/20 border border-cyan-500/50 text-cyan-300" : "bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700"}`}>Space</button>
                 </div>
               </div>
               {newInvitationForm.targetType === "workspace" ? (
-                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={workspaces} />
+                <SearchableSelect label="Workspace" placeholder="Buscar workspace..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({ ...newInvitationForm, targetId: id })} items={workspaces} />
               ) : (
-                <SearchableSelect label="Space" placeholder="Buscar space..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({...newInvitationForm, targetId: id})} items={spaces} />
+                <SearchableSelect label="Space" placeholder="Buscar space..." value={newInvitationForm.targetId} onChange={(id) => setNewInvitationForm({ ...newInvitationForm, targetId: id })} items={spaces} />
               )}
-              <select value={newInvitationForm.role} onChange={(e) => setNewInvitationForm({...newInvitationForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
+              <select value={newInvitationForm.role} onChange={(e) => setNewInvitationForm({ ...newInvitationForm, role: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white">
                 <option value="member">Miembro</option>
                 <option value="admin">Administrador</option>
               </select>
@@ -1135,25 +1175,25 @@ export default function AdminView({ isSuperAdmin = false }: { isSuperAdmin?: boo
             <form onSubmit={(e) => { e.preventDefault(); admin.handleJoinWorkspace(e); }} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Código de Invitación</label>
-                <input 
-                  type="text" 
-                  placeholder="ABC123" 
-                  value={admin.joinForm.inviteCode} 
-                  onChange={(e) => admin.setJoinForm({...admin.joinForm, inviteCode: e.target.value.toUpperCase()})} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white uppercase tracking-widest font-mono" 
+                <input
+                  type="text"
+                  placeholder="ABC123"
+                  value={admin.joinForm.inviteCode}
+                  onChange={(e) => admin.setJoinForm({ ...admin.joinForm, inviteCode: e.target.value.toUpperCase() })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white uppercase tracking-widest font-mono"
                   maxLength={6}
-                  required 
+                  required
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Slug del Workspace</label>
-                <input 
-                  type="text" 
-                  placeholder="nombre-del-workspace" 
-                  value={admin.joinForm.workspaceSlug} 
-                  onChange={(e) => admin.setJoinForm({...admin.joinForm, workspaceSlug: e.target.value.toLowerCase()})} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white lowercase" 
-                  required 
+                <input
+                  type="text"
+                  placeholder="nombre-del-workspace"
+                  value={admin.joinForm.workspaceSlug}
+                  onChange={(e) => admin.setJoinForm({ ...admin.joinForm, workspaceSlug: e.target.value.toLowerCase() })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white lowercase"
+                  required
                 />
               </div>
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800/80">

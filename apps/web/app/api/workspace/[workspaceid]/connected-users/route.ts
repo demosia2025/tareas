@@ -9,25 +9,26 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      console.log("❌ No hay sesión o user.id");
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const currentUserId = session.user.id;
+    const userRole = (session.user as any)?.role;
     const { workspaceid } = await params;
 
-    console.log(" Buscando membresía para:", { workspaceid, currentUserId });
+    // ✅ Permitir acceso a Super Admins y Admins sin verificar membresía explícita
+    const isSuperAdmin = userRole === "superadmin";
+    const isAdmin = userRole === "admin";
 
-    const membership = await prisma.workspaceMember.findFirst({
-      where: { workspaceId: workspaceid, userId: currentUserId },
-    });
+    if (!isSuperAdmin && !isAdmin) {
+      const membership = await prisma.workspaceMember.findFirst({
+        where: { workspaceId: workspaceid, userId: currentUserId },
+      });
 
-    if (!membership) {
-      console.log("❌ Usuario no es miembro del workspace");
-      return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
+      if (!membership) {
+        return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
+      }
     }
-
-    console.log("✅ Usuario es miembro. Buscando todos los miembros...");
 
     const members = await prisma.workspaceMember.findMany({
       where: { workspaceId: workspaceid },
@@ -39,15 +40,10 @@ export async function GET(
       orderBy: { joinedAt: "asc" },
     });
 
-    console.log(" Miembros encontrados:", members.length);
-
-    // Considera "online" si lastSeen es menor a 2 minutos
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-
     const users = members.map((m: any) => {
       const lastSeenDate = m.user.lastSeen || new Date(0);
       const isOnline = lastSeenDate > twoMinutesAgo;
-
       return {
         id: m.user.id,
         name: m.user.name || "Usuario",
@@ -66,7 +62,6 @@ export async function GET(
       return 0;
     });
 
-    console.log("✅ Usuarios procesados:", users.length);
     return NextResponse.json({ users });
   } catch (error) {
     console.error("❌ Error en connected-users API:", error);

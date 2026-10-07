@@ -32,8 +32,8 @@ export async function GET() {
       });
     }
 
-    // 3. Para usuarios normales, verificamos su rol CONTEXTUAL en algún workspace
-    // ✅ CORREGIDO: Usar 'workspaceMember' en lugar de 'organizationMember'
+    // 3. Para usuarios normales, verificamos su rol CONTEXTUAL en el workspace activo.
+    // Buscamos si el usuario es owner o admin de AL MENOS UN workspace en su organización.
     const workspaceMembership = await prisma.workspaceMember.findFirst({
       where: {
         userId: session.user.id,
@@ -45,7 +45,9 @@ export async function GET() {
 
     return NextResponse.json({
       isSuperAdmin: false,
-      isAdmin: isWorkspaceAdmin, // True si es admin/owner de algún workspace
+      // Solo es admin si el usuario es owner/admin de al menos un workspace, 
+      // y ese espacio es su contexto de administración principal.
+      isAdmin: isWorkspaceAdmin, 
       accessLevel: isWorkspaceAdmin ? "workspace" : "member",
       user: { id: user.id, name: user.name, email: user.email, role: globalRole }
     });

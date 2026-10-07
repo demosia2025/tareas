@@ -1,13 +1,20 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export function useAdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [stats, setStats] = useState({ totalUsers: 0, totalWorkspaces: 0, totalTasks: 0, totalMembers: 0 });
+  const [stats, setStats] = useState({ 
+    totalUsers: 0, 
+    totalWorkspaces: 0, 
+    totalTasks: 0, 
+    totalMembers: 0,
+    totalOrganizations: 0 
+  });
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [spaces, setSpaces] = useState<any[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
@@ -17,34 +24,47 @@ export function useAdminDashboard() {
   const [planInfo, setPlanInfo] = useState<any>(null);
   const [orgStats, setOrgStats] = useState<any[]>([]);
   const [workspaceStats, setWorkspaceStats] = useState<any[]>([]);
+
   const [searchWorkspaces, setSearchWorkspaces] = useState("");
   const [searchSpaces, setSearchSpaces] = useState("");
   const [searchOrgs, setSearchOrgs] = useState("");
   const [searchUsers, setSearchUsers] = useState("");
   const [searchInvitations, setSearchInvitations] = useState("");
   const [searchCodes, setSearchCodes] = useState("");
+
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [joinForm, setJoinForm] = useState({ inviteCode: "", workspaceSlug: "" });
-  const [activeTab, setActiveTab] = useState<"overview" | "workspaces" | "spaces" | "organizations" | "users" | "invitations" | "invite-codes">("overview");
+
+  // 🔑 activeTab incluyendo "tasks"
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "workspaces" | "spaces" | "organizations" | "users" | "invitations" | "invite-codes" | "tasks"
+  >("overview");
+
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [createUserForm, setCreateUserForm] = useState({ name: "", email: "", password: "", role: "user", organizationId: "", workspaceId: "" });
-  
-  // ✅ CORREGIDO: Agregados name y email al editForm
+  const [createUserForm, setCreateUserForm] = useState({ 
+    name: "", 
+    email: "", 
+    password: "", 
+    role: "user", 
+    organizationId: "", 
+    workspaceId: "" 
+  });
+
   const [editForm, setEditForm] = useState({ name: "", email: "", role: "user", password: "" });
 
   const fetchData = async () => {
     try {
-      const [statsRes, wsRes, spRes, orgRes, uRes, icRes, invRes, planRes] = await Promise.all([
+      // 🔑 Se removió fetch("/api/admin/organizations/plan") para corregir el error 404 en consola
+      const [statsRes, wsRes, spRes, orgRes, uRes, icRes, invRes] = await Promise.all([
         fetch("/api/admin/stats"),
         fetch("/api/admin/workspaces"),
         fetch("/api/admin/spaces"),
         fetch("/api/admin/organizations"),
         fetch("/api/admin/users"),
         fetch("/api/admin/invite-codes"),
-        fetch("/api/admin/invitations").catch(() => ({ ok: false, json: () => Promise.resolve({}) })),
-        fetch("/api/admin/organizations/plan").catch(() => ({ ok: false, json: () => Promise.resolve(null) } as unknown as Response))
+        fetch("/api/admin/invitations")
       ]);
 
       if (statsRes.ok) setStats(await statsRes.json());
@@ -76,11 +96,31 @@ export function useAdminDashboard() {
         const invData = await invRes.json();
         setInvitations(Array.isArray(invData) ? invData : (invData.invitations || []));
       }
-      if (planRes.ok) setPlanInfo(await planRes.json());
     } catch (error) {
       console.error("Error fetching admin data:", error);
     }
   };
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/metrics");
+      if (res.ok) {
+        const data = await res.json();
+        setStats({
+          totalWorkspaces: data.totalWorkspaces || 0,
+          totalUsers: data.totalUsers || 0,
+          totalTasks: data.totalTasks || 0,
+          totalOrganizations: data.totalOrganizations || 0,
+          totalMembers: data.totalMembers || 0
+        });
+        if (data.totalOrganizations) {
+          setOrgStats(new Array(data.totalOrganizations));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching metrics:", error);
+    }
+  }, []);
 
   const checkAdminAccess = async () => {
     try {
@@ -93,8 +133,9 @@ export function useAdminDashboard() {
       }
       setIsAdmin(true);
       await fetchData();
+      await fetchMetrics();
     } catch (error) {
-      console.error("Error verificando permisos");
+      console.error("Error verificando permisos:", error);
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +159,7 @@ export function useAdminDashboard() {
         body: JSON.stringify(createUserForm),
       });
       if (response.ok) {
-        fetchData();
+        await fetchData();
         setIsCreateUserOpen(false);
         setCreateUserForm({ name: "", email: "", password: "", role: "user", organizationId: "", workspaceId: "" });
       } else {
@@ -131,29 +172,31 @@ export function useAdminDashboard() {
     }
   };
 
-  // ✅ NUEVA FUNCIÓN: Actualizar usuario (incluye name y email)
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    
+
+    if (editingUser.role === "superadmin") {
+      alert("⛔ No puedes editar a un Super Admin. Esta cuenta está protegida.");
+      return;
+    }
+
     try {
-      const body: any = { 
+      const body: any = {
         name: editForm.name,
         email: editForm.email,
-        role: editForm.role 
+        role: editForm.role
       };
-      
-      // Solo incluir password si se proporcionó una nueva
       if (editForm.password && editForm.password.trim() !== "") {
         body.password = editForm.password;
       }
-      
+
       const res = await fetch(`/api/admin/users?id=${editingUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
       });
-      
+
       if (res.ok) {
         await fetchData();
         setEditingUser(null);
@@ -170,13 +213,33 @@ export function useAdminDashboard() {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    const userToDelete = users.find(u => u.id === userId);
+    if (userToDelete?.role === "superadmin") {
+      alert("⛔ No puedes eliminar a un Super Admin. Esta cuenta está protegida.");
+      return;
+    }
+
     if (!confirm("¿Eliminar usuario?")) return;
     try {
       await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const openEditUser = (user: any) => {
+    if (user.role === "superadmin") {
+      alert("⛔ No puedes editar a un Super Admin. Esta cuenta está protegida.");
+      return;
+    }
+    setEditingUser(user);
+    setEditForm({
+      name: user.name || "",
+      email: user.email || "",
+      role: user.role,
+      password: ""
+    });
   };
 
   const handleJoinWorkspace = async (e: React.FormEvent) => {
@@ -203,32 +266,50 @@ export function useAdminDashboard() {
   };
 
   const filteredWorkspaces = useMemo(() =>
-    (Array.isArray(workspaces) ? workspaces : []).filter(w => w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) || w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())),
+    (Array.isArray(workspaces) ? workspaces : []).filter(w =>
+      w.name?.toLowerCase().includes(searchWorkspaces.toLowerCase()) ||
+      w.slug?.toLowerCase().includes(searchWorkspaces.toLowerCase())
+    ),
     [workspaces, searchWorkspaces]
   );
 
   const filteredSpaces = useMemo(() =>
-    (Array.isArray(spaces) ? spaces : []).filter(s => s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) || s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())),
+    (Array.isArray(spaces) ? spaces : []).filter(s =>
+      s.name?.toLowerCase().includes(searchSpaces.toLowerCase()) ||
+      s.workspace?.name?.toLowerCase().includes(searchSpaces.toLowerCase())
+    ),
     [spaces, searchSpaces]
   );
 
   const filteredOrgs = useMemo(() =>
-    (Array.isArray(organizations) ? organizations : []).filter(o => o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) || o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())),
+    (Array.isArray(organizations) ? organizations : []).filter(o =>
+      o.name?.toLowerCase().includes(searchOrgs.toLowerCase()) ||
+      o.slug?.toLowerCase().includes(searchOrgs.toLowerCase())
+    ),
     [organizations, searchOrgs]
   );
 
   const filteredUsers = useMemo(() =>
-    (Array.isArray(users) ? users : []).filter(u => u.name?.toLowerCase().includes(searchUsers.toLowerCase()) || u.email?.toLowerCase().includes(searchUsers.toLowerCase())),
+    (Array.isArray(users) ? users : []).filter(u =>
+      u.name?.toLowerCase().includes(searchUsers.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchUsers.toLowerCase())
+    ),
     [users, searchUsers]
   );
 
   const filteredInvitations = useMemo(() =>
-    (Array.isArray(invitations) ? invitations : []).filter(i => i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) || i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())),
+    (Array.isArray(invitations) ? invitations : []).filter(i =>
+      i.invitedUser?.email?.toLowerCase().includes(searchInvitations.toLowerCase()) ||
+      i.workspace?.name?.toLowerCase().includes(searchInvitations.toLowerCase())
+    ),
     [invitations, searchInvitations]
   );
 
   const filteredCodes = useMemo(() =>
-    (Array.isArray(inviteCodes) ? inviteCodes : []).filter(c => c.code?.toLowerCase().includes(searchCodes.toLowerCase()) || c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())),
+    (Array.isArray(inviteCodes) ? inviteCodes : []).filter(c =>
+      c.code?.toLowerCase().includes(searchCodes.toLowerCase()) ||
+      c.createdBy?.name?.toLowerCase().includes(searchCodes.toLowerCase())
+    ),
     [inviteCodes, searchCodes]
   );
 
@@ -241,7 +322,7 @@ export function useAdminDashboard() {
     searchInvitations, setSearchInvitations, searchCodes, setSearchCodes,
     isCreateUserOpen, setIsCreateUserOpen, editingUser, setEditingUser,
     createUserForm, setCreateUserForm, editForm, setEditForm,
-    handleCreateUser, handleUpdateUser, handleDeleteUser, fetchData,
+    handleCreateUser, handleUpdateUser, handleDeleteUser, openEditUser, fetchData,
     isProfileMenuOpen, setIsProfileMenuOpen,
     isJoinModalOpen, setIsJoinModalOpen,
     joinForm, setJoinForm,
