@@ -83,17 +83,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             recipients.set(task.creator.email, task.creator.name || "Usuario");
           }
 
-          // Convertimos las llaves del Map a un Array común para evitar el error de iterador en compilación de TS sin ES2015 completo
           const recipientEmails = Array.from(recipients.keys());
 
           for (const email of recipientEmails) {
-            await sendCommentNotification(
-              email,
-              userRecord.name || "Un usuario",
-              body,
-              task.id,
-              task.title
-            );
+            // ✅ CORRECCIÓN: Usar sintaxis de objeto para SendGrid
+            await sendCommentNotification({
+              to: email,
+              commentedBy: userRecord.name || "Un usuario",
+              commentText: body,
+              taskId: task.id,
+              taskTitle: task.title,
+            });
             console.log(`DEBUG: Correo de comentario enviado exitosamente a: ${email}`);
           }
         }
