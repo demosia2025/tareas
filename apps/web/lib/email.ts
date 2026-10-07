@@ -1,62 +1,54 @@
-import { Resend } from "resend";
+import sgMail from '@sendgrid/mail';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Inicializar SendGrid con la API key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 
-export async function sendCommentNotification(to: string, senderName: string, content: string, taskId: string, taskTitle: string) {
-  try {
-    await resend.emails.send({
-      from: "Notificaciones SaaS <onboarding@resend.dev>",
-      to: [to],
-      subject: `Nuevo comentario en: ${taskTitle}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0891b2;">¡Nuevo comentario!</h2>
-          <p><strong>${senderName}</strong> ha comentado en la tarea:</p>
-          <div style="background: #f1f5f9; padding: 15px; border-radius: 8px;">
-            <h3 style="margin-top: 0;">${taskTitle}</h3>
-            <p>${content}</p>
-          </div>
-          <p style="margin-top: 20px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/tasks/${taskId}" 
-               style="background: #0891b2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-               Ver Comentario
-            </a>
-          </p>
-        </div>
-      `,
-    });
-  } catch (error) {
-    console.error("Error enviando correo de comentario:", error);
-  }
+interface SendTaskNotificationParams {
+  to: string;
+  taskTitle: string;
+  taskDescription?: string;
+  assignedBy: string;
+  taskId: string;
 }
 
-// Re-importing sendTaskNotification that was lost in the previous edit
-export async function sendTaskNotification(to: string, taskTitle: string, description: string, creatorName: string, taskId: string) {
-  try {
-    await resend.emails.send({
-      from: "Notificaciones SaaS <onboarding@resend.dev>",
-      to: [to],
-      subject: `Nueva Tarea Asignada: ${taskTitle}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0891b2;">¡Nueva tarea asignada!</h2>
-          <p>Hola,</p>
-          <p>Se te ha asignado una nueva tarea por <strong>${creatorName}</strong>.</p>
-          <div style="background: #f1f5f9; padding: 15px; border-radius: 8px;">
-            <h3 style="margin-top: 0;">${taskTitle}</h3>
-            <p>${description || "Sin descripción."}</p>
-          </div>
-          <p style="margin-top: 20px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/tasks/${taskId}" 
-               style="background: #0891b2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-               Ver Tarea
-            </a>
-          </p>
+export async function sendTaskNotification({
+  to,
+  taskTitle,
+  taskDescription,
+  assignedBy,
+  taskId,
+}: SendTaskNotificationParams): Promise<void> {
+  // Verificar que la API key esté configurada
+  if (!process.env.SENDGRID_API_KEY) {
+    console.warn('⚠️ SENDGRID_API_KEY no está configurada. El correo no se enviará.');
+    return;
+  }
+
+  const msg = {
+    to,
+    from: process.env.SENDGRID_FROM_EMAIL || 'noreply@comulsa.com',
+    subject: `Nueva tarea asignada: ${taskTitle}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #0ea5e9;">Nueva Tarea Asignada</h2>
+        <p>Hola,</p>
+        <p>Se te ha asignado una nueva tarea en el sistema de gestión:</p>
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #1e293b;">${taskTitle}</h3>
+          ${taskDescription ? `<p style="color: #64748b;">${taskDescription}</p>` : ''}
+          <p style="color: #64748b;"><strong>Asignado por:</strong> ${assignedBy}</p>
         </div>
-      `,
-    });
+        <p>Puedes ver los detalles de la tarea en el sistema.</p>
+        <p style="color: #94a3b8; font-size: 12px;">Este es un correo automático, por favor no responder.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`✅ Correo enviado exitosamente a ${to}`);
   } catch (error) {
-    console.error("Error enviando correo:", error);
+    console.error('❌ Error enviando correo con SendGrid:', error);
+    throw error;
   }
 }
-
