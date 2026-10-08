@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,12 +38,10 @@ export async function GET(req: Request) {
       });
     } else if (currentUserRole === "admin") {
       // 🛡️ ADMIN: Solo ver usuarios de SU organización (donde es OWNER) y NUNCA al superadmin
-      
-      // 1. Obtener los workspaces donde este usuario es estrictamente OWNER
       const adminMemberships = await prisma.workspaceMember.findMany({
         where: {
           userId: session.user.id,
-          role: "owner" // 🔑 FILTRO ESTRICTO DE PROPIEDAD
+          role: "owner"
         },
         select: {
           workspaceId: true,
@@ -61,7 +60,6 @@ export async function GET(req: Request) {
         return NextResponse.json([]);
       }
 
-      // 2. Obtener miembros de sus workspaces/organizaciones de propiedad, EXCLUYENDO superadmins
       const orgMemberships = await prisma.workspaceMember.findMany({
         where: {
           workspace: {
@@ -72,7 +70,7 @@ export async function GET(req: Request) {
           },
           user: {
             role: {
-              not: "superadmin" // 🛡️ CRÍTICO: NUNCA devolver superadmins a un admin regular
+              not: "superadmin"
             }
           }
         },
@@ -89,7 +87,6 @@ export async function GET(req: Request) {
         }
       });
 
-      // 3. Eliminar duplicados
       const uniqueUsersMap = new Map();
       orgMemberships.forEach(m => {
         if (m.user && !uniqueUsersMap.has(m.user.id)) {
@@ -110,7 +107,7 @@ export async function GET(req: Request) {
 }
 
 // ==========================================
-// PATCH: Actualizar usuario (Con protección anti-modificación de superadmin)
+// PATCH: Actualizar usuario (Con soporte para contraseña)
 // ==========================================
 export async function PATCH(req: Request) {
   try {
@@ -141,7 +138,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "No tienes permisos para modificar un Super Admin" }, { status: 403 });
     }
 
-    // Si es admin, verificar que tenga jurisdicción sobre este usuario (misma organización propia)
+    // Si es admin, verificar que tenga jurisdicción sobre este usuario
     if (currentUserRole === "admin") {
       const adminMemberships = await prisma.workspaceMember.findMany({
         where: {
@@ -177,7 +174,7 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { name, email, role } = body;
+    const { name, email, role, password } = body;
 
     // Un admin no puede promover a alguien a superadmin
     if (currentUserRole === "admin" && role === "superadmin") {
@@ -188,6 +185,21 @@ export async function PATCH(req: Request) {
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;
+
+    // ✅ NUEVO: Manejar actualización de contraseña
+    if (password !== undefined && password !== null && password !== "") {
+      if (password.length < 6) {
+        return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+      console.log(`✅ Contraseña hasheada para el usuario ${targetUserId}`);
+    }
+
+    // Si no hay nada que actualizar, retornar error
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No hay datos para actualizar" }, { status: 400 });
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
@@ -200,6 +212,7 @@ export async function PATCH(req: Request) {
       }
     });
 
+    console.log(`✅ Usuario actualizado: ${updatedUser.id}`);
     return NextResponse.json(updatedUser);
   } catch (error: any) {
     console.error("Error updating user:", error);
