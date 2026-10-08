@@ -21,10 +21,6 @@ export async function GET(request: Request) {
 
     const userRole = user?.role;
 
-    if (userRole !== "superadmin" && userRole !== "admin") {
-      return NextResponse.json({ error: "No tienes permisos" }, { status: 403 });
-    }
-
     const { searchParams } = new URL(request.url);
     const listId = searchParams.get("listId");
     const workspaceId = searchParams.get("workspaceId");
@@ -55,7 +51,7 @@ export async function GET(request: Request) {
         ];
       }
     } 
-    // 🛡️ LÓGICA ADMIN: Aislamiento estricto por propiedad
+    // ️ LÓGICA ADMIN: Aislamiento estricto por propiedad
     else if (userRole === "admin") {
       const adminWorkspaces = await prisma.workspaceMember.findMany({
         where: {
@@ -84,6 +80,43 @@ export async function GET(request: Request) {
         { list: { space: { workspaceId: { in: targetWorkspaceIds } } } },
         { list: { workspaceId: { in: targetWorkspaceIds } } }
       ];
+    } 
+    // 👤 LÓGICA USUARIO NORMAL: Solo ve sus propias tareas
+    else {
+      // Filtrar solo tareas asignadas al usuario o creadas por él
+      if (workspaceId) {
+        whereClause.OR = [
+          { 
+            AND: [
+              { assigneeId: session.user.id },
+              { workspaceId: workspaceId }
+            ]
+          },
+          { 
+            AND: [
+              { creatorId: session.user.id },
+              { workspaceId: workspaceId }
+            ]
+          },
+          { 
+            AND: [
+              { assigneeId: session.user.id },
+              { list: { space: { workspaceId: workspaceId } } }
+            ]
+          },
+          { 
+            AND: [
+              { creatorId: session.user.id },
+              { list: { space: { workspaceId: workspaceId } } }
+            ]
+          }
+        ];
+      } else {
+        whereClause.OR = [
+          { assigneeId: session.user.id },
+          { creatorId: session.user.id }
+        ];
+      }
     }
 
     const allTasks = await prisma.task.findMany({
