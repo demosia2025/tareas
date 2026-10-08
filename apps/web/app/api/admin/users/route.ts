@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // ==========================================
-// GET: Obtener usuarios (Con blindaje de seguridad)
+// GET: Obtener usuarios (Superadmin ve TODOS los usuarios, admin ve solo los de su organización)
 // ==========================================
 export async function GET(req: Request) {
   try {
@@ -20,13 +20,8 @@ export async function GET(req: Request) {
     let users: any[] = [];
 
     if (currentUserRole === "superadmin") {
-      // 👑 Super Admin puede ver a todos los usuarios excepto a otros Super Admins (por seguridad)
+      // 👑 Super Admin puede ver a TODOS los usuarios, INCLUYENDO otros superadmins
       users = await prisma.user.findMany({
-        where: {
-          role: {
-            not: "superadmin"
-          }
-        },
         select: {
           id: true,
           name: true,
@@ -186,7 +181,7 @@ export async function PATCH(req: Request) {
     if (email !== undefined) updateData.email = email;
     if (role !== undefined) updateData.role = role;
 
-    // ✅ NUEVO: Manejar actualización de contraseña
+    // ✅ Manejar actualización de contraseña
     if (password !== undefined && password !== null && password !== "") {
       if (password.length < 6) {
         return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
