@@ -54,6 +54,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -82,7 +83,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
     }
   }, [taskId]);
 
-  // ✅ CORREGIDO: Usar endpoint correcto con query params
   useEffect(() => {
     const fetchWorkspaceMembers = async () => {
       if (!workspaceId) {
@@ -90,7 +90,6 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
         return;
       }
       try {
-        // ✅ CAMBIO: /api/workspace/members?workspaceId=... en lugar de /api/workspaces/${workspaceId}/members
         const res = await fetch(`/api/workspace/${workspaceId}/members`);
         if (res.ok) {
           const data = await res.json();
@@ -232,6 +231,32 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
     }
   };
 
+  // ✅ NUEVA: Función para eliminar archivos adjuntos
+  const handleDeleteAttachment = async (attachmentId: string, fileName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el archivo "${fileName}"?`)) return;
+    
+    setDeletingId(attachmentId);
+    try {
+      const res = await fetch(`/api/attachments/${attachmentId}`, {
+        method: "DELETE",
+      });
+      
+      if (res.ok) {
+        // Actualizar la lista local inmediatamente
+        setAttachments((prev) => prev.filter((att) => att.id !== attachmentId));
+        await fetchData();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Error al eliminar el archivo");
+      }
+    } catch (error) {
+      console.error("Error al eliminar archivo:", error);
+      alert("Error de conexión al eliminar el archivo");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const isImage = (type?: string, name?: string) => {
     if (type && type.startsWith("image/")) return true;
     if (name && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name)) return true;
@@ -256,55 +281,74 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
       <div className="flex border-b border-slate-800 pb-2 gap-4 flex-shrink-0">
         <button
           onClick={() => setActiveSubTab("chat")}
-          className={`text-xs font-bold uppercase tracking-wider pb-1 transition-colors ${
-            activeSubTab === "chat" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-slate-400 hover:text-white"
-          }`}
+          className={`text-xs font-bold uppercase tracking-wider pb-1 transition-colors ${activeSubTab === "chat" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-slate-400 hover:text-white"}`}
         >
           Chat y Archivos
         </button>
         <button
           onClick={() => setActiveSubTab("members")}
-          className={`text-xs font-bold uppercase tracking-wider pb-1 transition-colors ${
-            activeSubTab === "members" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-slate-400 hover:text-white"
-          }`}
+          className={`text-xs font-bold uppercase tracking-wider pb-1 transition-colors ${activeSubTab === "members" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-slate-400 hover:text-white"}`}
         >
           Miembros de la Tarea
         </button>
       </div>
+
       {activeSubTab === "chat" ? (
         <div className="flex flex-col h-[65vh] space-y-3">
           {attachments.length > 0 && (
             <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                Archivos Adjuntos
+                Archivos Adjuntos ({attachments.length})
               </span>
               <div className="grid grid-cols-2 gap-2.5">
                 {attachments.map((att) => {
                   const imageFile = isImage(att.fileType, att.fileName);
+                  const isDeleting = deletingId === att.id;
                   return (
                     <div
                       key={att.id}
-                      onClick={() => handleOpenFile(att)}
-                      className="group flex flex-col bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg overflow-hidden transition-all cursor-pointer"
+                      className="group relative flex flex-col bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg overflow-hidden transition-all"
                     >
-                      {imageFile ? (
-                        <div className="w-full h-24 bg-slate-900 overflow-hidden relative">
-                          <img
-                            src={att.fileUrl}
-                            alt={att.fileName}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
+                      {/* Botón de eliminar */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAttachment(att.id, att.fileName);
+                        }}
+                        disabled={isDeleting}
+                        className="absolute top-1 right-1 z-10 p-1 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg cursor-pointer"
+                        title="Eliminar archivo"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      
+                      <div
+                        onClick={() => !isDeleting && handleOpenFile(att)}
+                        className="flex-1 cursor-pointer"
+                      >
+                        {imageFile ? (
+                          <div className="w-full h-24 bg-slate-900 overflow-hidden relative">
+                            <img
+                              src={att.fileUrl}
+                              alt={att.fileName}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-full h-24 bg-slate-900/80 flex items-center justify-center text-cyan-400">
+                            <FileText className="w-8 h-8 opacity-80" />
+                          </div>
+                        )}
+                        <div className="p-2 flex items-center gap-1.5 bg-slate-950">
+                          {imageFile ? <ImageIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> : <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                          <span className="truncate text-[11px] text-slate-300 group-hover:text-cyan-400 transition-colors">
+                            {att.fileName}
+                          </span>
                         </div>
-                      ) : (
-                        <div className="w-full h-24 bg-slate-900/80 flex items-center justify-center text-cyan-400">
-                          <FileText className="w-8 h-8 opacity-80" />
-                        </div>
-                      )}
-                      <div className="p-2 flex items-center gap-1.5 bg-slate-950">
-                        {imageFile ? <ImageIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> : <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
-                        <span className="truncate text-[11px] text-slate-300 group-hover:text-cyan-400 transition-colors">
-                          {att.fileName}
-                        </span>
                       </div>
                     </div>
                   );
@@ -312,6 +356,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               </div>
             </div>
           )}
+
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">
             {Array.isArray(activities) && activities.length > 0 ? (
               activities.map((activity) => (
@@ -323,8 +368,8 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-slate-300">{activity.user || "Usuario"}</span>
                       <span className="text-[10px] text-slate-500">
-                        {activity.createdAt ? new Date(activity.createdAt).toLocaleString('es-ES', { 
-                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                        {activity.createdAt ? new Date(activity.createdAt).toLocaleString('es-ES', {
+                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
                         }) : ""}
                       </span>
                     </div>
@@ -338,16 +383,15 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
               <p className="text-xs text-slate-500 text-center py-6">No hay mensajes ni actividad registrada aún.</p>
             )}
           </div>
+
           <form onSubmit={(e) => handleSend(e)} className="pt-2 flex items-center gap-2 mt-auto border-t border-slate-800">
-            <label className={`p-2 rounded-lg cursor-pointer transition-colors ${
-              isUploading ? 'bg-slate-800 text-slate-500' : 'text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800'
-            }`} title="Adjuntar archivo">
+            <label className={`p-2 rounded-lg cursor-pointer transition-colors ${isUploading ? 'bg-slate-800 text-slate-500' : 'text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800'}`} title="Adjuntar archivo">
               {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-              <input 
-                type="file" 
-                onChange={handleFileUpload} 
-                className="hidden" 
-                disabled={isUploading} 
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={isUploading}
               />
             </label>
             <input
@@ -373,23 +417,20 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
           <div className="flex gap-2 bg-slate-900/40 p-1 rounded-lg border border-slate-800 flex-shrink-0">
             <button
               onClick={() => setMemberTab("assign")}
-              className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
-                memberTab === "assign" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
+              className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${memberTab === "assign" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
             >
               <UserPlus className="w-3.5 h-3.5 inline mr-1.5" />
               Asignar Responsable
             </button>
             <button
               onClick={() => setMemberTab("invite")}
-              className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
-                memberTab === "invite" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
+              className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${memberTab === "invite" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
             >
               <Users className="w-3.5 h-3.5 inline mr-1.5" />
               Invitar Colaboradores
             </button>
           </div>
+
           {memberTab === "assign" ? (
             <div className="space-y-3">
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
@@ -427,6 +468,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                   <span className="text-[10px] text-emerald-400 mt-1 block">✓ Responsable asignado correctamente</span>
                 )}
               </div>
+
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Usuarios de la Organización ({filteredMembers.length})
@@ -492,6 +534,7 @@ export function ActivityTab({ taskId, workspaceId }: ActivityTabProps) {
                   </button>
                 </div>
               </div>
+
               <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
                 <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Colaboradores Invitados ({members.length})
